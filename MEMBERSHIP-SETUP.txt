@@ -1,0 +1,59 @@
+Ridgeline - setting up memberships, feedback and first responder keys
+
+All settings are at the top of the script in index.html, in two blocks:
+MEMBERSHIP (plans and payments) and CONTACT (where messages go).
+Open index.html in any text editor, search for "MEMBERSHIP SETTINGS", edit, save, and upload again.
+
+PLANS AND PRICES (already filled in)
+  Free   - maps, GPS, weather, up to 10 places, all search and rescue tools
+  Basic  - $4.99/month or $39.99/year: unlimited places, routes, tracks, hunting areas,
+           custom team icons, QR codes, GPX/GeoJSON files
+  Pro    - $9.99/month or $79.99/year: everything in Basic plus offline maps, 3D,
+           elevation and steepness, projected routes
+  Search and rescue safety tools (check-ins, last known point, clues, sectors, teams)
+  are always free so nobody is blocked during a search.
+
+OPTION A - LEMON SQUEEZY (recommended: handles sales tax for you)
+  1. Create a store at lemonsqueezy.com.
+  2. Create a product named "Ridgeline Basic" with two subscription variants: Monthly $4.99 and Yearly $39.99.
+  3. Create a product named "Ridgeline Pro" with Monthly $9.99 and Yearly $79.99.
+     The word "Pro" must be in the product or variant name; that is how the app knows the plan.
+  4. Turn on "Generate license keys" for both products. Buyers get the key in their receipt email.
+  5. Copy each variant's checkout link (Share > Checkout URL) into MEMBERSHIP.checkout:
+       basic_month, basic_year, pro_month, pro_year
+  6. Set provider:'lemonsqueezy'.
+
+OPTION B - GUMROAD
+  1. Create membership products for Basic and Pro (monthly and yearly tiers) and turn on license keys.
+  2. Paste the checkout links into MEMBERSHIP.checkout.
+  3. Put each product id in gumroadProducts, e.g. gumroadProducts:{'abc123':'basic','def456':'pro'}.
+  4. Set provider:'gumroad'.
+
+STRIPE
+  Stripe does not give license keys that an app can check on its own. It needs a small server
+  that records who paid. Ask for this if you want Stripe later.
+
+FIRST RESPONDER KEYS (free Pro for verified responders)
+  1. Lemon Squeezy: create a product named "Ridgeline First Responder" priced at $0,
+     with license keys turned on, and hide it from your store.
+     Gumroad: create a $0 product and add it as gumroadProducts:{'<id>':'responder'}.
+  2. When a verification request arrives, check it: reply to the agency email address they gave
+     (not a personal one), or call the agency. Never ask for photos of ID cards.
+  3. Once confirmed, send them the $0 checkout link. Their receipt email contains the key.
+     They enter it under Menu > See plans > Already paid.
+  Responder keys unlock Pro plus responder mode (USNG grid, 24-hour times, incident log).
+
+WHERE FEEDBACK AND VERIFICATION REQUESTS GO (CONTACT block)
+  - formUrl: create a free form at formspree.io (or a similar service) and paste its endpoint,
+    e.g. formUrl:'https://formspree.io/f/xxxxxxx'. Messages arrive in your email.
+    Messages written without a connection are sent automatically later.
+  - email: an address people are shown if no formUrl is set (they copy and send it themselves).
+  - On the shared claude.ai page, messages are saved in that page's database instead.
+
+GOOD TO KNOW
+  - Without internet, a paid plan keeps working for 30 days, then needs one check online.
+  - The plan check runs inside the app. Someone technical could get around it.
+    That is normal for apps without a server and is fine for a small business.
+  - You need a privacy policy and terms of sale before charging. Lemon Squeezy and Gumroad act
+    as the seller of record and cover payment terms, but your app still needs a privacy policy.
+  - Testing: set paywall:false to turn everything on while you check things.

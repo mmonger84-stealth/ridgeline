@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ridgeline</title>
+<meta name="description" content="Outdoor mapping for hunting, hiking and search and rescue.">
+<meta name="theme-color" content="#17221C">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ridgeline">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#E6EBE3; --panel:#F6F8F3; --ink:#17231C; --muted:#5A6B5F; --line:#C3CEC0;
+  --accent:#D9480F; --accent-ink:#fff; --map:#E1E8DC; --grid:#C9D4C5; --good:#2F8F4E; --bad:#C0392B; --crew:#2563B8;
+  --bubble:#E9EEE6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1612; --panel:#17221C; --ink:#E3EAE2; --muted:#8C9D92; --line:#2A3A30;
+    --accent:#FF7A2B; --accent-ink:#1A0E05; --map:#16241C; --grid:#33493B; --good:#4CC97A; --bad:#FF6B5A; --crew:#6BA6FF;
+    --bubble:#1F2D25; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1612; --panel:#17221C; --ink:#E3EAE2; --muted:#8C9D92; --line:#2A3A30;
+  --accent:#FF7A2B; --accent-ink:#1A0E05; --map:#16241C; --grid:#33493B; --good:#4CC97A; --bad:#FF6B5A; --crew:#6BA6FF;
+  --bubble:#1F2D25; color-scheme:dark;
+}
+html,body{height:100%;margin:0}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.35 'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#app{height:100%;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+#teamBtn{width:42px;padding:0;border-radius:50%;font-weight:700;font-size:15px;display:grid;place-items:center}
+.hr{display:flex;gap:6px;align-items:center}
+header h1{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font:700 21px/1 'Barlow Condensed',system-ui,sans-serif;margin:0;letter-spacing:.02em}
+.btn{min-height:42px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:600;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.chip{min-height:40px;padding:0 12px;border-radius:22px;border:1px solid var(--line);background:var(--panel);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+main{flex:1;position:relative;min-height:0}
+.tab{position:absolute;top:0;right:0;bottom:0;left:0;display:none}
+.tab.on{display:block}
+#chat{flex-direction:column}
+#chat.on{display:flex}
+nav{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line);background:var(--panel)}
+nav[hidden]{display:none}
+nav button{background:none;border:0;min-height:44px;font:600 17px 'Barlow Condensed',system-ui,sans-serif;color:var(--muted);border-top:3px solid transparent}
+nav button[aria-selected="true"]{color:var(--ink);border-top-color:var(--accent)}
+#mapwrap{position:absolute;top:0;right:0;bottom:0;left:0;background:var(--map)}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+.float{position:absolute;border-radius:50%;width:46px;height:46px;padding:0;display:grid;place-items:center;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+#meBtn{right:12px;bottom:16px;font-size:14px}
+#zin{right:12px;bottom:70px;font-size:22px}
+#zout{right:12px;bottom:124px;font-size:22px}
+#actions{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:8px}
+#actions .btn{min-height:46px;padding:0 20px;border-radius:23px;font-size:17px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;margin:6px 0}.thumbs button{padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;aspect-ratio:1;background:var(--bg);max-width:100%}.thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+label.item{cursor:pointer}
+.sw{width:14px;height:14px;border-radius:4px;flex:none}
+#bar{position:absolute;left:12px;right:80px;bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+#hint{position:absolute;left:16px;right:16px;top:14px;padding:10px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font-size:16px;pointer-events:none}
+#hint[hidden]{display:none}
+#v3dBtn{right:12px;bottom:178px;font-size:15px}
+#v3d{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;background:var(--map)}
+#cv3{width:100%;height:100%;display:block;touch-action:none}
+#v3top{position:absolute;left:12px;right:12px;top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#v3msg{background:var(--panel);padding:6px 10px;border-radius:8px;font-size:14px;border:1px solid var(--line)}#v3msg:empty{display:none}
+#v3bot{position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 8px}
+#v3bot .chip{min-height:36px;padding:0 10px}#v3info{flex:1 0 100%}#v3info:empty{display:none}
+#tilemsg{position:absolute;left:16px;right:16px;top:14px;z-index:2;display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--panel);border:2px solid var(--accent);font-size:15px}
+#tilemsg span{flex:1;min-width:0}
+#tilemsg .btn{min-height:38px}
+#scale{position:absolute;left:16px;bottom:72px;font-size:13px;color:var(--ink);pointer-events:none;background:var(--panel);background:color-mix(in srgb,var(--panel) 80%,transparent);padding:1px 6px;border-radius:6px}
+#elev,#slopeLeg{position:absolute;left:16px;font-size:13px;color:var(--ink);pointer-events:none;background:var(--panel);background:color-mix(in srgb,var(--panel) 80%,transparent);padding:1px 6px;border-radius:6px}
+#elev{bottom:96px}
+#coord{position:absolute;left:16px;bottom:148px;font-size:13px;font-weight:600;color:var(--ink);pointer-events:none;background:var(--panel);background:color-mix(in srgb,var(--panel) 85%,transparent);padding:1px 6px;border-radius:6px;font-variant-numeric:tabular-nums}
+#frBadge{display:inline-block;vertical-align:middle;font:700 11px/1 Barlow,system-ui,sans-serif;letter-spacing:.06em;color:#fff;background:#C0392B;padding:3px 6px;border-radius:5px;margin-left:4px}
+#frBadge[hidden]{display:none}
+@media (max-width:380px){header h1.fr #appName{display:none}}
+#slopeLeg{bottom:122px;right:70px;font-size:12px}
+#slopeLeg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 8px;vertical-align:-1px}
+#attrib{position:absolute;left:16px;bottom:52px;font-size:11px;color:var(--ink);pointer-events:none;background:var(--panel);background:color-mix(in srgb,var(--panel) 80%,transparent);padding:1px 6px;border-radius:6px}
+#backdrop{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.4);display:none;z-index:20}
+#backdrop.on{display:block}
+#sheet{position:fixed;left:0;right:0;bottom:0;max-height:92%;overflow:auto;overscroll-behavior:contain;background:var(--panel);border-radius:16px 16px 0 0;border-top:1px solid var(--line);padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));z-index:21;transform:translateY(105%);transition:transform .2s ease}
+#sheet.on{transform:none}
+#app{max-width:100vw;overflow:hidden}
+@media (max-width:380px){header{padding:6px 8px;gap:6px}header .btn{padding:0 10px}header h1{font-size:18px}#windBtn{max-width:118px;overflow:hidden;text-overflow:ellipsis}}
+@media (min-width:700px){#sheet{left:50%;right:auto;width:560px;border-radius:16px 16px 0 0;border:1px solid var(--line);transform:translate(-50%,105%)}#sheet.on{transform:translate(-50%,0)}#toast{max-width:480px}}
+#sheet h2{font:700 22px/1.1 'Barlow Condensed',system-ui,sans-serif;margin:0 0 4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;margin:6px 0}
+.grid .chip{justify-content:center;border-radius:10px;padding:0 6px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin:6px 0}
+.grid2 .item{margin:0;min-height:52px;align-items:flex-start;padding:6px 10px}
+.grid2 .item .m{font-size:12px;line-height:1.25}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.plan{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--bg)}.plan.cur{border:2px solid var(--accent)}.plan h3{margin:0;font:700 21px/1.1 'Barlow Condensed',system-ui,sans-serif}.plan .price{font-weight:700;font-variant-numeric:tabular-nums}.plan ul{margin:6px 0 8px;padding-left:20px;font-size:15px}
+a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}a.btn.primary{color:var(--accent-ink)}
+.in{width:100%;min-height:48px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+.lbl{font-size:13px;color:var(--muted);margin-top:8px;text-transform:uppercase;letter-spacing:.05em}
+.stat{color:var(--muted);font-size:16px;margin:4px 0}
+.note{font-size:14px;color:var(--muted)}
+.ok{color:var(--good);font-weight:600}.no{color:var(--bad);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--accent);min-height:40px}
+.item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;min-height:48px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:6px}
+.item .m{font-size:15px;color:var(--muted)}
+.card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+details summary{min-height:48px;display:flex;align-items:center;font-weight:600;cursor:pointer}
+#chatList{flex:1;overflow:auto;padding:12px 12px 4px;display:flex;flex-direction:column;gap:6px}
+.msg{max-width:84%;padding:8px 12px;border-radius:14px;background:var(--bubble);align-self:flex-start;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
+.msg .who{font-size:13px;opacity:.75;margin-bottom:2px}
+.msg.bad{opacity:.6;font-style:italic}
+#composer{display:flex;gap:8px;padding:8px 10px;border-top:1px solid var(--line);background:var(--panel)}
+#gate{padding:24px 18px;max-width:460px;margin:0 auto}
+#gate h2{font:700 28px/1.1 'Barlow Condensed',sans-serif;margin:0 0 8px}
+[hidden]{display:none!important}
+#toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:16px;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s;max-width:88%;text-align:center}
+#toast.on{opacity:1}
+@media (prefers-reduced-motion: reduce){#sheet,#toast{transition:none}}
+body{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+button,input,textarea{touch-action:manipulation}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="btn" id="menuBtn">Menu</button>
+    <h1><span id="appName">Ridgeline</span> <span id="frBadge" hidden>RESPONDER</span></h1>
+    <div class="hr"><button class="btn" id="teamBtn" aria-label="Choose my team"></button><button class="btn" id="windBtn">Set wind</button></div>
+  </header>
+  <main>
+    <section id="map" class="tab on" aria-label="Map">
+      <div id="mapwrap"><canvas id="cv" aria-label="Map. Drag to move, pinch to zoom."></canvas></div>
+      <div id="tilemsg" hidden><span id="tilemsgT"></span><button class="btn" id="tilemsgX" aria-label="Hide this message">OK</button></div>
+      <div id="hint" hidden>Drag the map until the cross is on the spot, then tap Tools.</div>
+      <div id="scale"></div>
+      <div id="elev" hidden></div>
+      <div id="coord" hidden></div>
+      <div id="slopeLeg" hidden>Steepness<i style="background:#E5C100"></i>10–20°<i style="background:#F08A24"></i>20–30°<i style="background:#D63A2F"></i>30–40°<i style="background:#8E24AA"></i>40°+<span id="slopeMsg"></span></div>
+      <div id="attrib" hidden></div>
+      <button class="btn float" id="zout" aria-label="Zoom out">&minus;</button>
+      <button class="btn float" id="zin" aria-label="Zoom in">+</button>
+      <button class="btn float" id="meBtn" aria-label="Show where I am">Me</button>
+      <div id="actions"><button class="btn primary" id="addBtn">Tools</button><button class="btn" id="savedBtn">Saved</button></div>
+      <div id="bar" hidden></div>
+      <button class="btn float" id="v3dBtn" aria-label="Show this area in 3D">3D</button>
+      <div id="v3d" hidden><canvas id="cv3" aria-label="3D terrain. Drag to turn and tilt, pinch to zoom."></canvas>
+        <div id="v3top"><button class="btn primary" id="v3close">Back to 2D map</button><span id="v3msg"></span></div>
+        <div id="v3bot"><span class="note">Height</span><span id="v3ex"></span><button class="btn" id="v3reset">Reset view</button><span id="v3info" class="note"></span></div></div>
+    </section>
+    <section id="chat" class="tab" aria-label="Crew chat">
+      <div id="gate" hidden></div>
+      <div id="chatList" aria-live="polite" hidden></div>
+      <div id="composer" hidden>
+        <input id="msgin" class="in" placeholder="Message the crew" maxlength="1000" autocomplete="off">
+        <button class="btn primary" id="sendbtn">Send</button>
+      </div>
+    </section>
+  </main>
+  <nav id="nav" hidden>
+    <button data-tab="map" aria-selected="true">Map</button>
+    <button data-tab="chat" aria-selected="false">Crew</button>
+  </nav>
+</div>
+<div id="backdrop"></div>
+<div id="sheet" role="dialog" aria-modal="true"></div>
+<div id="toast" role="status"></div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+function h(tag,attrs,...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v)}for(const c of kids.flat()){if(c==null||c===false)continue;e.append(c.nodeType?c:document.createTextNode(String(c)))}return e}
+const LS={get(k,d){try{const v=localStorage.getItem('rl_'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('rl_'+k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem('rl_'+k)}catch(e){}}};
+const rad=Math.PI/180,R=6371008.8;
+/* Minimal QR encoder: byte mode, error correction M, versions 1-15 (up to about 410 bytes). */
+/* ===== MEMBERSHIP SETTINGS (edit these) =====================================
+   provider: '' until you pick one, then 'lemonsqueezy' or 'gumroad'.
+   checkout: paste the checkout link for each plan from your payment company.
+   gumroadProducts: only for Gumroad, map each product id to 'basic' or 'pro'.
+   paywall: false turns every feature on for everyone (handy while testing).
+   See MEMBERSHIP-SETUP.txt for step-by-step instructions.                    */
+const MEMBERSHIP={
+  paywall:false,  /* TEST BUILD: everything unlocked */
+  provider:'',
+  checkout:{basic_month:'',basic_year:'',pro_month:'',pro_year:''},
+  gumroadProducts:{},
+  prices:{basic:{month:'$4.99',year:'$39.99'},pro:{month:'$9.99',year:'$79.99'}},
+  freePlaceLimit:10,
+  recheckDays:3,offlineGraceDays:30};
+/* Where feedback and first responder verification requests are sent.
+   formUrl: a form service endpoint that accepts JSON (for example Formspree).
+   email: shown to people as a fallback if no formUrl is set.
+   On the shared claude.ai page, messages are stored in the page's own database. */
+const CONTACT={formUrl:'',email:''};
+/* ========================================================================== */
+const QR=(()=>{
+  const EC=[0,[10,1,16,0],[16,1,28,0],[26,1,44,0],[18,2,32,0],[24,2,43,0],[16,4,27,0],[18,4,31,0],[22,2,38,2],[22,3,36,2],[26,4,43,1],[30,1,50,4],[22,6,36,2],[22,8,37,1],[24,4,40,5],[24,5,41,5]];
+  const AL=[0,[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70]];
+  const mul=(x,y)=>{let z=0;for(let i=7;i>=0;i--){z=(z<<1)^((z>>>7)*0x11D);z^=((y>>>i)&1)*x}return z};
+  function divisor(n){const r=new Array(n).fill(0);r[n-1]=1;let root=1;for(let i=0;i<n;i++){for(let j=0;j<n;j++){r[j]=mul(r[j],root);if(j+1<n)r[j]^=r[j+1]}root=mul(root,2)}return r}
+  function rem(data,div){const r=new Array(div.length).fill(0);for(const b of data){const f=b^r.shift();r.push(0);div.forEach((d,i)=>r[i]^=mul(d,f))}return r}
+  function make(text){
+    const bytes=Array.from(new TextEncoder().encode(text));let v=1,cap;
+    for(;v<=15;v++){const e=EC[v];cap=e[1]*e[2]+e[3]*(e[2]+1);if(4+(v<10?8:16)+bytes.length*8<=cap*8)break}
+    if(v>15)return null;
+    const [ecn,g1,d1,g2]=EC[v],bits=[],put=(val,n)=>{for(let i=n-1;i>=0;i--)bits.push((val>>>i)&1)};
+    put(4,4);put(bytes.length,v<10?8:16);bytes.forEach(b=>put(b,8));put(0,Math.min(4,cap*8-bits.length));while(bits.length%8)bits.push(0);
+    const data=[];for(let i=0;i<bits.length;i+=8)data.push(parseInt(bits.slice(i,i+8).join(''),2));for(let p=0;data.length<cap;p++)data.push(p%2?0x11:0xEC);
+    const blocks=[],div=divisor(ecn);let k=0;for(let b=0;b<g1+g2;b++){const n=b<g1?d1:d1+1,d=data.slice(k,k+n);k+=n;blocks.push([d,rem(d,div)])}
+    const cw=[];for(let i=0;i<=d1;i++)blocks.forEach(([d])=>{if(i<d.length)cw.push(d[i])});for(let i=0;i<ecn;i++)blocks.forEach(([,e])=>cw.push(e[i]));
+    const N=v*4+17,M=[...Array(N)].map(()=>new Array(N).fill(false)),F=[...Array(N)].map(()=>new Array(N).fill(false));
+    const set=(x,y,d)=>{M[y][x]=d;F[y][x]=true};
+    for(let i=0;i<N;i++){set(6,i,i%2===0);set(i,6,i%2===0)}
+    for(const [cx,cy] of [[3,3],[N-4,3],[3,N-4]])for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const x=cx+dx,y=cy+dy,dd=Math.max(Math.abs(dx),Math.abs(dy));if(x>=0&&x<N&&y>=0&&y<N)set(x,y,dd!==2&&dd!==4)}
+    const al=AL[v],L=al.length;for(let i=0;i<L;i++)for(let j=0;j<L;j++){if((i===0&&j===0)||(i===0&&j===L-1)||(i===L-1&&j===0))continue;for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)set(al[i]+dx,al[j]+dy,Math.max(Math.abs(dx),Math.abs(dy))!==1)}
+    const fmt=mask=>{const d=mask;let r=d;for(let i=0;i<10;i++)r=(r<<1)^((r>>>9)*0x537);const b=((d<<10)|r)^0x5412,g=i=>((b>>>i)&1)===1;
+      for(let i=0;i<=5;i++)set(8,i,g(i));set(8,7,g(6));set(8,8,g(7));set(7,8,g(8));for(let i=9;i<15;i++)set(14-i,8,g(i));
+      for(let i=0;i<8;i++)set(N-1-i,8,g(i));for(let i=8;i<15;i++)set(8,N-15+i,g(i));set(8,N-8,true)};
+    fmt(0);
+    if(v>=7){let r=v;for(let i=0;i<12;i++)r=(r<<1)^((r>>>11)*0x1F25);const b=(v<<12)|r;for(let i=0;i<18;i++){const bit=((b>>>i)&1)===1,a=N-11+i%3,c=Math.floor(i/3);set(a,c,bit);set(c,a,bit)}}
+    let i=0;for(let right=N-1;right>=1;right-=2){if(right===6)right=5;for(let vert=0;vert<N;vert++)for(let j=0;j<2;j++){const x=right-j,up=((right+1)&2)===0,y=up?N-1-vert:vert;if(!F[y][x]&&i<cw.length*8){M[y][x]=((cw[i>>>3]>>>(7-(i&7)))&1)===1;i++}}}
+    const MS=[(x,y)=>(x+y)%2===0,(x,y)=>y%2===0,(x,y)=>x%3===0,(x,y)=>(x+y)%3===0,(x,y)=>(Math.floor(x/3)+Math.floor(y/2))%2===0,(x,y)=>x*y%2+x*y%3===0,(x,y)=>(x*y%2+x*y%3)%2===0,(x,y)=>((x+y)%2+x*y%3)%2===0];
+    const apply=m=>{for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!F[y][x]&&MS[m](x,y))M[y][x]=!M[y][x]};
+    const score=()=>{let s=0,dark=0;for(let a=0;a<N;a++){let rx=1,ry=1;for(let b=1;b<N;b++){if(M[a][b]===M[a][b-1]){rx++;if(rx===5)s+=3;else if(rx>5)s++}else rx=1;if(M[b][a]===M[b-1][a]){ry++;if(ry===5)s+=3;else if(ry>5)s++}else ry=1}}
+      for(let y=0;y<N;y++)for(let x=0;x<N;x++){if(M[y][x])dark++;if(x<N-1&&y<N-1){const c=M[y][x];if(c===M[y][x+1]&&c===M[y+1][x]&&c===M[y+1][x+1])s+=3}}
+      return s+Math.floor(Math.abs(dark*20-N*N*10)/(N*N))*10};
+    let best=0,bs=Infinity;for(let m=0;m<8;m++){apply(m);fmt(m);const sc=score();if(sc<bs){bs=sc;best=m}apply(m)}
+    apply(best);fmt(best);return {size:N,version:v,get:(x,y)=>M[y][x]}}
+  function draw(cv,text,px){const q=make(text);if(!q)return false;const s=Math.max(2,Math.floor((px||260)/(q.size+8))),W=(q.size+8)*s;cv.width=W;cv.height=W;const c=cv.getContext('2d');
+    c.fillStyle='#fff';c.fillRect(0,0,W,W);c.fillStyle='#000';for(let y=0;y<q.size;y++)for(let x=0;x<q.size;x++)if(q.get(x,y))c.fillRect((x+4)*s,(y+4)*s,s,s);return true}
+  return {make,draw}})();
+const TEAMS=[{id:'cmd',l:'Command',c:'#B8860B',g:'★'},{id:'alpha',l:'Alpha',c:'#D63A2F',g:'▲'},{id:'bravo',l:'Bravo',c:'#2563B8',g:'■'},{id:'charlie',l:'Charlie',c:'#2F8F4E',g:'●'},{id:'delta',l:'Delta',c:'#8250B0',g:'◆'},{id:'echo',l:'Echo',c:'#D9780F',g:'▼'},{id:'k9',l:'K-9',c:'#1E8A94',g:'K9'},{id:'med',l:'Medical',c:'#C2185B',g:'+'}];
+const TMAP=Object.fromEntries(TEAMS.map(t=>[t.id,t]));
+const HEX=/^#[0-9a-fA-F]{6}$/;
+const tmOf=v=>{if(!v)return null;if(TMAP[v])return TMAP[v];if(v[0]!=='~')return null;const a=v.split('~');if(a.length<4||!HEX.test(a[2]))return null;const g=Array.from(a[3]).slice(0,2).join('');return g?{id:v,l:(a[1]||'Team').slice(0,20),c:a[2],g}:null};
+const mkTeam=(l,c,g)=>'~'+l.replace(/~/g,'').slice(0,20)+'~'+c+'~'+Array.from(g).slice(0,2).join('');
+const savedTeams=()=>{const a=LS.get('myteams',[]);return Array.isArray(a)?a.filter(v=>typeof v==='string'&&tmOf(v)):[]};
+const allTeams=()=>[...TEAMS,...savedTeams().map(tmOf)];
+const KINDS={waypoint:{l:'Waypoint',c:'#5F6B64',g:'•'},trailhead:{l:'Trailhead',c:'#6B7785',g:'P'},camp:{l:'Camp',c:'#8250B0',g:'T'},water:{l:'Water',c:'#1E9A94',g:'W'},hazard:{l:'Hazard',c:'#B7410E',g:'H'},stand:{l:'Stand',c:'#D9480F',g:'S'},camera:{l:'Camera',c:'#2F6FB5',g:'C'},lkp:{l:'Last known point',c:'#C0392B',g:'L'},clue:{l:'Clue',c:'#C79100',g:'!'},checkin:{l:'Check-in',c:'#2563B8',g:'✓'}};
+const OCT=['N','NE','E','SE','S','SW','W','NW'];
+const octOf=d=>OCT[Math.round(((d%360)+360)%360/45)%8];
+
+/* state */
+let view=LS.get('view',{lat:45,lon:-90,mpp:20});
+let units=LS.get('units','imp');
+let wind=LS.get('wind',null);
+const features=new Map();
+let me=null,watchId=null,followNext=false,dbh=null,uid=LS.get('uid',null)||('l'+Math.random().toString(36).slice(2,10));
+let W=0,H=0,dpr=1,dirty=false;
+if(!LS.get('callsign',null))LS.set('callsign','Hunter'+Math.floor(10+Math.random()*89));
+const callsign=()=>LS.get('callsign','Hunter');
+const myTeam=()=>{const t=LS.get('team','');return tmOf(t)?t:''};
+const teamName=t=>tmOf(t)?tmOf(t).l:(t||'');
+
+/* geo */
+const hav=(a,b)=>{const dLa=(b[0]-a[0])*rad,dLo=(b[1]-a[1])*rad,s=Math.sin(dLa/2)**2+Math.cos(a[0]*rad)*Math.cos(b[0]*rad)*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(s))};
+const bearing=(a,b)=>{const y=Math.sin((b[1]-a[1])*rad)*Math.cos(b[0]*rad),x=Math.cos(a[0]*rad)*Math.sin(b[0]*rad)-Math.sin(a[0]*rad)*Math.cos(b[0]*rad)*Math.cos((b[1]-a[1])*rad);return (Math.atan2(y,x)/rad+360)%360};
+function fmtDist(m){if(units==='imp'){const ft=m*3.28084;return ft<1100?Math.round(ft)+' ft':(m/1609.344).toFixed(2)+' mi'}return m<1000?Math.round(m)+' m':(m/1000).toFixed(2)+' km'}
+const fmtLL0=(la,lo)=>la.toFixed(5)+', '+lo.toFixed(5);
+function usng(la,lo){
+  if(!(la>=-80&&la<84))return 'Polar area, grid not shown';
+  let zone=Math.floor((lo+180)/6)+1;if(lo>=180)zone=60;
+  if(la>=56&&la<64&&lo>=3&&lo<12)zone=32;
+  if(la>=72){if(lo>=0&&lo<9)zone=31;else if(lo>=9&&lo<21)zone=33;else if(lo>=21&&lo<33)zone=35;else if(lo>=33&&lo<42)zone=37}
+  const a=6378137,f=1/298.257223563,e2=f*(2-f),ep2=e2/(1-e2),k0=.9996,phi=la*rad,lam0=((zone-1)*6-180+3)*rad;
+  const Nn=a/Math.sqrt(1-e2*Math.sin(phi)**2),T=Math.tan(phi)**2,Cc=ep2*Math.cos(phi)**2,A=Math.cos(phi)*(lo*rad-lam0),e4=e2*e2,e6=e4*e2;
+  const M=a*((1-e2/4-3*e4/64-5*e6/256)*phi-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*phi)+(15*e4/256+45*e6/1024)*Math.sin(4*phi)-(35*e6/3072)*Math.sin(6*phi));
+  const E=k0*Nn*(A+(1-T+Cc)*A**3/6+(5-18*T+T*T+72*Cc-58*ep2)*A**5/120)+500000;
+  let Nr=k0*(M+Nn*Math.tan(phi)*(A*A/2+(5-T+9*Cc+4*Cc*Cc)*A**4/24+(61-58*T+T*T+600*Cc-330*ep2)*A**6/720));if(la<0)Nr+=10000000;
+  const band='CDEFGHJKLMNPQRSTUVWX'[Math.min(19,Math.floor((la+80)/8))],set=((zone-1)%6)+1;
+  const col=['ABCDEFGH','JKLMNPQR','STUVWXYZ'][(set-1)%3][Math.floor(E/1e5)-1],row='ABCDEFGHJKLMNPQRSTUV'[(Math.floor(Nr/1e5)+(set%2?0:5))%20];
+  const p5=v=>String(Math.floor(v)%100000).padStart(5,'0');
+  return zone+band+' '+col+row+' '+p5(E)+' '+p5(Nr)}
+const fmtLL=(la,lo)=>frOn()?usng(la,lo)+' · '+fmtLL0(la,lo):fmtLL0(la,lo);
+const mLon=()=>111320*Math.cos(view.lat*rad);
+const toXY=(la,lo)=>[W/2+(lo-view.lon)*mLon()/view.mpp,H/2-(la-view.lat)*111320/view.mpp];
+const fromXY=(x,y)=>[view.lat-(y-H/2)*view.mpp/111320,view.lon+(x-W/2)*view.mpp/mLon()];
+const mph2=v=>units==='imp'?Math.round(v)+' mph':Math.round(v*1.609)+' km/h';
+
+/* ui helpers */
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),3000)}
+function openSheet(nodes){const s=$('#sheet');s.replaceChildren(...nodes.flat().filter(Boolean));s.classList.add('on');$('#backdrop').classList.add('on')}
+function closeSheet(){$('#sheet').classList.remove('on');$('#backdrop').classList.remove('on');delete $('#sheet').dataset.wx}
+$('#backdrop').addEventListener('click',closeSheet);
+function setTab(n){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id===n));document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===n)));if(n==='map')resize();if(n==='chat')renderChat()}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+
+/* places */
+const newId=()=>'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const persistLocal=()=>{if(!dbh)LS.set('features',[...features.values()])};
+const STATUS={todo:{l:'Not started',c:'#6B7785'},assigned:{l:'Assigned',c:'#2563B8'},active:{l:'Searching',c:'#E07B00'},done:{l:'Searched',c:'#2F8F4E'}};
+const centroid=p=>[p.reduce((s,q)=>s+q[0],0)/p.length,p.reduce((s,q)=>s+q[1],0)/p.length];
+const pathLen=p=>{let d=0;for(let i=1;i<p.length;i++)d+=hav(p[i-1],p[i]);return d};
+function areaM2(p){const lat0=p.reduce((s,q)=>s+q[0],0)/p.length,kx=111320*Math.cos(lat0*rad),ky=111320;let a=0;for(let i=0;i<p.length;i++){const j=(i+1)%p.length;a+=(p[i][1]*kx)*(p[j][0]*ky)-(p[j][1]*kx)*(p[i][0]*ky)}return Math.abs(a)/2}
+const fmtArea=m2=>units==='imp'?(m2/4046.856).toFixed(1)+' acres':(m2/10000).toFixed(1)+' ha';
+function inPoly(x,y,P){let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){if((P[i][1]>y)!==(P[j][1]>y)&&x<(P[j][0]-P[i][0])*(y-P[i][1])/(P[j][1]-P[i][1])+P[i][0])c=!c}return c}
+function segDist(px,py,a,b){const vx=b[0]-a[0],vy=b[1]-a[1],l=vx*vx+vy*vy;let t=l?((px-a[0])*vx+(py-a[1])*vy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-(a[0]+t*vx),py-(a[1]+t*vy))}
+function ago(ts){const m=Math.round((Date.now()-ts)/60000);if(m<1)return 'just now';if(m<60)return m+' min ago';const hh=Math.floor(m/60);return hh<24?hh+' h ago':Math.floor(hh/24)+' d ago'}
+const base=()=>({id:newId(),note:'',winds:[],pts:[],status:'todo',seen:0,team:myTeam(),radius:0,who:callsign(),by:uid,ts:Date.now()});
+const TYPES=['pin','sector','track','area'];const AREA_C='#FF8C1A';
+function normFeat(id,d){
+  const type=TYPES.includes(d.type)?d.type:'pin';
+  const pts=Array.isArray(d.pts)?d.pts.filter(p=>Array.isArray(p)&&isFinite(p[0])&&isFinite(p[1])).slice(0,2000).map(p=>[+p[0],+p[1]]):[];
+  let la=+d.la,lo=+d.lo;if(type!=='pin'&&pts.length){const c=centroid(pts);la=c[0];lo=c[1]}
+  const kind=type==='pin'?(KINDS[d.kind]?d.kind:'waypoint'):(type==='track'&&d.kind==='route'?'route':type);
+  return{id,type,kind,name:String(d.name||'').slice(0,80),note:String(d.note||'').slice(0,1000),winds:Array.isArray(d.winds)?d.winds.filter(w=>OCT.includes(w)):[],la,lo,pts,status:STATUS[d.status]?d.status:'todo',team:String(d.team||'').slice(0,80),radius:isFinite(d.radius)?Math.max(0,+d.radius):0,who:String(d.who||'').slice(0,40),by:String(d.by||''),ts:isFinite(d.ts)?+d.ts:0,seen:isFinite(d.seen)?+d.seen:0}}
+const toDoc=f=>({type:f.type,kind:f.kind,name:f.name,note:f.note,winds:f.winds,la:f.la,lo:f.lo,pts:f.pts.map(p=>[+p[0].toFixed(6),+p[1].toFixed(6)]),status:f.status,team:f.team,radius:f.radius,who:f.who,by:f.by||uid,ts:f.ts||Date.now(),seen:f.seen||0});
+const fromDoc=normFeat;
+const latestBy=new Map();
+function calcLatest(){latestBy.clear();for(const f of features.values())if(f.kind==='checkin'){const k=f.by||f.who,c=features.get(latestBy.get(k));if(!c||f.ts>c.ts)latestBy.set(k,f.id)}}
+const shown=f=>f.kind!=='checkin'||latestBy.get(f.by||f.who)===f.id;
+async function saveFeature(f){features.set(f.id,f);persistLocal();redraw();if(dbh){try{await dbh.collection('features').doc(f.id).set(toDoc(f))}catch(e){toast('Saved on this device only. The shared map could not be updated.')}}}
+async function removeFeature(id){features.delete(id);phDelAll(id);persistLocal();redraw();if(dbh){try{await dbh.collection('features').doc(id).delete()}catch(e){toast('Could not remove it from the shared map.')}}}
+const windOk=f=>{if(f.kind!=='stand'||!f.winds.length||!wind)return null;return f.winds.includes(octOf(wind.from))};
+
+/* map background: USGS satellite and topo tiles, optionally saved for offline */
+const SHARED=!!(window.claude&&window.claude.use);
+let bg=SHARED?'grid':LS.get('bg','hybrid');if(!SHARED&&!['grid','sat','hybrid','topo','relief'].includes(bg))bg='hybrid';
+const TILE={
+  sat:{n:'Satellite',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/',max:16,kb:30,a:'Imagery: USGS National Map'},
+  hybrid:{n:'Hybrid',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/',max:16,kb:35,a:'Imagery and topo: USGS National Map'},
+  relief:{n:'Relief',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/',max:15,kb:20,a:'Shaded relief: USGS National Map'},
+  topo:{n:'Topo',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/',max:16,kb:25,a:'Topo: USGS National Map'}};
+const tx=(lon,z)=>(lon+180)/360*2**z;
+const ty=(lat,z)=>{const s=Math.sin(lat*rad);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*2**z};
+const tlon=(x,z)=>x/2**z*360-180;
+const tlat=(y,z)=>{const n=Math.PI-2*Math.PI*y/2**z;return 180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)))};
+function zFor(){const L=Math.log2(156543.03*Math.cos(view.lat*rad)/view.mpp);return Math.max(2,Math.min(TILE[bg]?TILE[bg].max:16,Math.round(L)+(dpr>=2?1:0)))}
+let idbP=null;
+function idb(){if(!idbP)idbP=new Promise((res,rej)=>{try{const r=indexedDB.open('ridgeline-tiles',1);r.onupgradeneeded=()=>r.result.createObjectStore('t');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}});return idbP}
+const idbReq=(mode,f)=>idb().then(db=>new Promise((res,rej)=>{const t=db.transaction('t',mode),r=f(t.objectStore('t'));t.oncomplete=()=>res(r&&r.result);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error)}));
+const idbGet=k=>idbReq('readonly',s=>s.get(k)).catch(()=>null);
+const idbPut=(k,v)=>idbReq('readwrite',s=>s.put(v,k));
+const idbCount=()=>idbReq('readonly',s=>s.count()).catch(()=>0);
+const idbClear=()=>idbReq('readwrite',s=>s.clear());
+const idbHas=k=>idbReq('readonly',s=>s.getKey(k)).then(v=>v!==undefined).catch(()=>false);
+const tcache=new Map(),tpend=new Set();let tOk=0,tFail=0,tmsgOff=false;
+function getTile(layer,z,x,y){
+  const k=layer+'/'+z+'/'+x+'/'+y,c=tcache.get(k);
+  if(c&&c.img)return c.img;
+  if((c&&Date.now()-c.t<20000)||tpend.has(k))return null;
+  tpend.add(k);loadTile(layer,z,x,y,k);return null}
+async function loadTile(layer,z,x,y,k){
+  let img=null;
+  try{const blob=await idbGet(k);if(blob)img=typeof createImageBitmap==='function'?await createImageBitmap(blob):await new Promise(res=>{const u=URL.createObjectURL(blob),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);res(i)};i.onerror=()=>{URL.revokeObjectURL(u);res(null)};i.src=u})}catch(e){}
+  if(!img)img=await new Promise(res=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>res(null);i.src=TILE[layer].u+z+'/'+y+'/'+x});
+  tpend.delete(k);tcache.set(k,{img,t:Date.now()});if(img)tOk++;else{tFail++;if(!tOk)redraw()}
+  if(tcache.size>400)tcache.delete(tcache.keys().next().value);
+  if(img&&layer===bg)redraw()}
+function drawTiles(){
+  const z=zFor(),n=2**z,tl=fromXY(0,0),br=fromXY(W,H);
+  const x0=Math.floor(tx(tl[1],z)),x1=Math.floor(tx(br[1],z)),y0=Math.floor(ty(tl[0],z)),y1=Math.floor(ty(br[0],z));
+  if((x1-x0+1)*(y1-y0+1)>150)return;
+  for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){
+    if(y<0||y>=n)continue;
+    const im=getTile(bg,z,((x%n)+n)%n,y);if(!im)continue;
+    const a=toXY(tlat(y,z),tlon(x,z)),b=toXY(tlat(y+1,z),tlon(x+1,z));
+    ctx.drawImage(im,a[0],a[1],b[0]-a[0]+0.5,b[1]-a[1]+0.5)}}
+function planTiles(){
+  const tl=fromXY(-W*.25,-H*.25),br=fromXY(W*1.25,H*1.25),z0=Math.max(2,zFor()-1);let zmax=Math.min(TILE[bg].max,z0+3),list;
+  for(;;){list=[];
+    for(let z=z0;z<=zmax;z++){const n=2**z,xa=Math.floor(tx(tl[1],z)),xb=Math.floor(tx(br[1],z)),ya=Math.max(0,Math.floor(ty(tl[0],z))),yb=Math.min(n-1,Math.floor(ty(br[0],z)));for(let x=xa;x<=xb;x++)for(let y=ya;y<=yb;y++)list.push([z,((x%n)+n)%n,y])}
+    if(list.length<=2000||zmax<=z0)break;zmax--}
+  return list}
+async function openOffline(){
+  if(!can('offline')){upsell('offline');return}
+  if(bg==='grid'){bg='sat';LS.set('bg',bg);redraw()}
+  const layer=bg,t=TILE[layer],list=planTiles();
+  if(list.length>2000){toast('Zoom in to the area you want to save, then try again.');return}
+  const mb=Math.max(1,Math.round(list.length*t.kb/1024)),have=await idbCount();
+  let cancel=false,running=false;
+  const st=h('div',{class:'stat',text:t.n+' for the area on screen plus a margin: '+list.length+' tiles, about '+mb+' MB. Do this on Wi-Fi.'});
+  const go=h('button',{class:'btn primary',text:'Save area',onclick:async()=>{
+    if(running)return;running=true;cancel=false;go.disabled=true;
+    let done=0,fail=0,i=0,blocked=false;
+    const work=async()=>{while(!cancel&&!blocked&&i<list.length){const [z,x,y]=list[i++],k=layer+'/'+z+'/'+x+'/'+y;
+      try{if(!(await idbHas(k))){const r=await fetch(t.u+z+'/'+y+'/'+x);if(!r.ok)throw new Error('http');await idbPut(k,await r.blob())}done++}
+      catch(e){fail++;if(done===0&&fail>=3)blocked=true}
+      st.textContent='Saved '+done+' of '+list.length+(fail?' ('+fail+' failed)':'')+'…'}};
+    await Promise.all([work(),work(),work(),work()]);
+    running=false;go.disabled=false;
+    st.textContent=blocked?'The map service did not allow saving tiles, or there is no connection. Offline maps are not available right now.':cancel?'Stopped. Saved '+done+' tiles.':'Done. Saved '+done+' tiles'+(fail?', '+fail+' failed':'')+'. This area now works offline.'}});
+  openSheet([h('h2',{text:'Save for offline'}),st,h('div',{class:'row'},go,h('button',{class:'btn',text:'Stop',onclick:()=>{cancel=true}}),h('button',{class:'btn',text:'Close',onclick:()=>{cancel=true;closeSheet()}})),
+    have?h('div',{},h('div',{class:'stat',text:have+' tiles saved on this device.'}),h('div',{class:'row'},h('button',{class:'btn danger',text:'Delete saved maps',onclick:async()=>{await idbClear().catch(()=>{});tcache.clear();redraw();toast('Saved maps deleted.')}}))):null,
+    h('div',{class:'note',text:'Tiles come from the USGS National Map and cover the US. Keep the area to your hunting ground, not the whole state.'})])}
+let installEvt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e});
+const HOSTED=!SHARED&&/^https?:$/.test(location.protocol);
+const STANDALONE=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+if(HOSTED&&'serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+function installSection(){
+  if(!HOSTED||STANDALONE)return [];
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const btn=installEvt?h('div',{class:'row'},h('button',{class:'btn primary',text:'Install Ridgeline',onclick:async()=>{const ev=installEvt;installEvt=null;try{ev.prompt();await ev.userChoice}catch(e){}closeSheet()}})):null;
+  return [h('div',{class:'lbl',text:'Install on this device'}),btn,h('div',{class:'note',text:ios?'In Safari, tap the Share button, then Add to Home Screen. Ridgeline then opens like an app and works offline.':installEvt?'Adds Ridgeline to your home screen or app list so it opens like an app and works offline.':'Use your browser menu and choose Install app or Add to Home screen. Ridgeline then opens like an app and works offline.'})]}
+function qrCanvas(){return h('canvas',{style:'display:block;margin:8px auto;width:240px;height:240px;max-width:100%;image-rendering:pixelated;border-radius:8px;border:1px solid var(--line)'})}
+function saveQr(cv,name){try{cv.toBlob(b=>{if(b)saveFile(name,b);else toast('Could not make the image.')},'image/png')}catch(e){toast('Could not make the image.')}}
+async function copyText(t,inp){try{await navigator.clipboard.writeText(t);toast('Link copied.')}catch(e){if(inp){inp.focus();inp.select()}toast('Select the link and copy it.')}}
+function openShare(){
+  if(!can('qr')){upsell('qr');return}
+  const inp=h('input',{class:'in',type:'url',placeholder:'https://your-ridgeline-link','aria-label':'Link to share'});inp.value=HOSTED?location.origin+location.pathname:LS.get('shareUrl','');
+  const t=myTeam(),teamOk=!!tmOf(t)&&!(SHARED&&t[0]==='~');let withTeam=teamOk;
+  const cv=qrCanvas(),cap=h('div',{class:'stat',style:'text-align:center;overflow-wrap:anywhere'}),tr=h('div',{class:'row'});
+  const link=()=>{let u=inp.value.trim();if(!u)return '';u=u.split('#')[0];return withTeam?u+'#team-'+(t[0]==='~'?encodeURIComponent(t):t):u};
+  const upd=()=>{const u=link();if(!HOSTED)LS.set('shareUrl',inp.value.trim());if(!u){cv.hidden=true;cap.textContent='Paste the link to your Ridgeline page above.';return}cv.hidden=!QR.draw(cv,u,480);cap.textContent=cv.hidden?'That link is too long for a QR code.':u};
+  const dt=()=>tr.replaceChildren(teamOk?h('button',{class:'chip','aria-pressed':String(withTeam),text:withTeam?'Joins team '+tmOf(t).l:'Add my team to the link',onclick:()=>{withTeam=!withTeam;dt();upd()}}):h('div',{class:'note',text:SHARED&&tmOf(t)?'Custom team icons cannot travel in a link to this shared page. Pick a preset team to include it.':'Pick a team with the round button at the top to add it to the link.'}));
+  inp.addEventListener('input',upd);dt();
+  openSheet([h('h2',{text:'Share with a QR code'}),h('div',{class:'stat',text:'Team members scan this with their phone camera to open Ridgeline. With your team added, they join it automatically.'}),
+    h('div',{class:'lbl',text:'Link'}),inp,tr,cv,cap,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Save QR image',onclick:()=>{if(!cv.hidden)saveQr(cv,'ridgeline-qr.png')}}),h('button',{class:'btn',text:'Copy link',onclick:()=>{const u=link();if(u)copyText(u,inp)}}),h('button',{class:'btn',text:'Close',onclick:closeSheet})),
+    h('div',{class:'note',text:SHARED?'Copy this page’s link from the claude.ai Share menu and paste it above. People also need access to the page, which you give from that Share menu.':HOSTED?'This is the address Ridgeline is running from.':'Put Ridgeline on a website first, then paste its address above. A file on your phone cannot be opened from a QR code.'})]);upd()}
+function openPinQR(f){
+  if(!can('qr')){upsell('qr');return}
+  const u='https://www.google.com/maps/search/?api=1&query='+f.la.toFixed(5)+'%2C'+f.lo.toFixed(5),cv=qrCanvas();QR.draw(cv,u,480);
+  openSheet([h('h2',{text:'QR code: '+f.name}),h('div',{class:'stat',text:'Scan with any phone camera to open this spot in a maps app. It works for people who do not have Ridgeline.'}),cv,
+    h('div',{class:'stat',style:'text-align:center',text:fmtLL(f.la,f.lo)}),
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Save QR image',onclick:()=>saveQr(cv,(f.name||'spot').replace(/[^\w-]+/g,'-').slice(0,40)+'-qr.png')}),h('button',{class:'btn',text:'Back',onclick:()=>openFeature(f.id)}))])}
+/* membership */
+const RANK={free:0,basic:1,pro:2};
+const NEED={area:'basic',places:'basic',route:'basic',track:'basic',customTeam:'basic',qr:'basic',files:'basic',d3:'pro',offline:'pro',terrain:'pro',proj:'pro'};
+const FEAT={area:'Area shapes',places:'More than '+MEMBERSHIP.freePlaceLimit+' places',route:'Planning routes',track:'Recording your track',customTeam:'Custom team icons',qr:'QR code sharing',files:'GPX and GeoJSON import and export',d3:'3D terrain view',offline:'Offline maps',terrain:'Elevation, steepness and route profiles',proj:'Projected routes'};
+const DAY=864e5;
+function lic(){const l=LS.get('lic',null);return l&&typeof l==='object'&&RANK[l.plan]?l:null}
+function plan(){const l=lic();if(!l)return 'free';if(l.exp&&Date.now()>l.exp)return 'free';if(Date.now()-(l.checked||0)>MEMBERSHIP.offlineGraceDays*DAY)return 'free';return l.plan}
+const can=f=>SHARED||!MEMBERSHIP.paywall||RANK[plan()]>=RANK[NEED[f]||'free'];
+const planName=p=>({free:'Free',basic:'Basic',pro:'Pro'})[p];
+async function checkLicense(key){
+  const pv=MEMBERSHIP.provider,form=o=>Object.entries(o).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
+  if(pv==='lemonsqueezy'){
+    const r=await fetch('https://api.lemonsqueezy.com/v1/licenses/validate',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body:form({license_key:key})});
+    const j=await r.json();if(!j||!j.valid||!j.license_key||!['active','inactive'].includes(j.license_key.status))return {ok:false,why:(j&&j.error)||'That key is not active.'};
+    const name=((j.meta&&j.meta.product_name)||'')+' '+((j.meta&&j.meta.variant_name)||'');
+    return {ok:true,plan:/pro|responder/i.test(name)?'pro':'basic',responder:/responder/i.test(name),exp:j.license_key.expires_at?Date.parse(j.license_key.expires_at):0}}
+  if(pv==='gumroad'){
+    for(const [pid,pl] of Object.entries(MEMBERSHIP.gumroadProducts)){
+      const r=await fetch('https://api.gumroad.com/v2/licenses/verify',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({product_id:pid,license_key:key,increment_uses_count:'false'})});
+      const j=await r.json().catch(()=>null);if(!j||!j.success)continue;const pu=j.purchase||{};
+      if(pu.refunded||pu.chargebacked||pu.subscription_cancelled_at||pu.subscription_failed_at||pu.subscription_ended_at)return {ok:false,why:'That membership has ended.'};
+      return {ok:true,plan:pl==='responder'?'pro':pl,responder:pl==='responder',exp:0}}
+    return {ok:false,why:'That key was not found.'}}
+  return {ok:false,why:'Payments are not set up yet.'}}
+async function activate(key,out){
+  key=key.trim();if(!key){out.textContent='Paste the license key from your receipt email.';return}
+  out.textContent='Checking…';
+  try{const r=await checkLicense(key);if(!r.ok){out.textContent=r.why;return}
+    LS.set('lic',{key,plan:r.plan,responder:!!r.responder,exp:r.exp,checked:Date.now()});out.textContent='';toast(r.responder?'First responder access is on. Thank you for what you do.':'Ridgeline '+planName(r.plan)+' is on. Thank you!');closeSheet();afterPlanChange()}
+  catch(e){out.textContent='Could not check the key. You need an internet connection to activate.'}}
+async function recheck(){const l=lic();if(!l||!MEMBERSHIP.provider||!navigator.onLine)return;if(Date.now()-(l.checked||0)<MEMBERSHIP.recheckDays*DAY)return;
+  try{const r=await checkLicense(l.key);if(r.ok)LS.set('lic',{...l,plan:r.plan,responder:!!r.responder,exp:r.exp,checked:Date.now()});else{LS.del('lic');toast('Your Ridgeline membership has ended. Free features still work.')}afterPlanChange()}catch(e){}}
+function afterPlanChange(){if(!can('terrain')){slopeOn=false}if(V3&&V3.on&&!can('d3'))close3D();redraw()}
+function upsell(f){const need=NEED[f]||'basic';
+  openSheet([h('h2',{text:planName(need)+' feature'}),h('div',{class:'stat',text:FEAT[f]+' is part of Ridgeline '+planName(need)+(need==='basic'?' and Pro':'')+'.'}),
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'See plans',onclick:openPlans}),h('button',{class:'btn',text:'Not now',onclick:closeSheet})),
+    h('div',{class:'note',text:'Check-ins, last known points, clues, search sectors and teams stay free, so nobody is blocked during a search.'})])}
+function gate(f,fn){return (...a)=>{if(!can(f)){upsell(f);return}return fn(...a)}}
+let planPeriod='year';
+function openPlans(){
+  const cur=plan(),P=MEMBERSHIP.prices,ready=!!MEMBERSHIP.provider;
+  const per=h('div',{class:'row'},...[['month','Monthly'],['year','Yearly · save 33%']].map(([k,l])=>h('button',{class:'chip','aria-pressed':String(planPeriod===k),text:l,onclick:()=>{planPeriod=k;openPlans()}})));
+  const LIST={free:['Satellite, hybrid, topo and relief maps','GPS, wind and weather','Up to '+MEMBERSHIP.freePlaceLimit+' places like stands and camps','Search and rescue: check-ins, last known point, clues, sectors, teams'],
+    basic:['Everything in Free','Unlimited places','Plan routes, record tracks and draw hunting areas','Custom team icons and QR code sharing','GPX and GeoJSON import and export'],
+    pro:['Everything in Basic','Offline maps','3D terrain view','Elevation, steepness and route profiles','Projected routes for searches']};
+  const card=p=>{const link=p==='free'?'':MEMBERSHIP.checkout[p+'_'+planPeriod];
+    const act=p===cur?h('div',{class:'ok',text:'Your plan'}):p==='free'?null:link?h('a',{class:'btn primary',href:link,target:'_blank',rel:'noopener',text:'Get '+planName(p)}):h('button',{class:'btn',disabled:'',text:'Coming soon'});
+    return h('div',{class:'plan'+(p===cur?' cur':'')},h('div',{style:'display:flex;justify-content:space-between;align-items:baseline;gap:8px'},h('h3',{text:planName(p)}),h('span',{class:'price',text:p==='free'?'$0':P[p][planPeriod]+(planPeriod==='month'?' / month':' / year')})),
+      h('ul',{},...LIST[p].map(t=>h('li',{text:t}))),act)};
+  const key=h('input',{class:'in',placeholder:'License key','aria-label':'License key',autocomplete:'off'}),out=h('div',{class:'stat'});
+  const l=lic();
+  openSheet([h('h2',{text:'Ridgeline plans'}),per,card('free'),card('basic'),card('pro'),
+    h('div',{class:'lbl',text:'Already paid?'}),h('div',{class:'stat',text:'Paste the license key from your receipt email.'}),key,out,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Activate',onclick:()=>activate(key.value,out)}),l?h('button',{class:'btn',text:'Remove key from this device',onclick:()=>{LS.del('lic');toast('Key removed.');afterPlanChange();openPlans()}}):null,h('button',{class:'btn',text:'Close',onclick:closeSheet})),
+    l?h('div',{class:'note',text:'Key on this device: …'+l.key.slice(-6)+(l.exp?' · renews or ends '+new Date(l.exp).toLocaleDateString():'')+'. Checked '+ago(l.checked)+'. Without internet, your plan keeps working for '+MEMBERSHIP.offlineGraceDays+' days.'}):null,
+    h('div',{class:'note',text:'First responders (search and rescue, fire, EMS, law enforcement, emergency management) get Pro free after verification. See First responder in the Menu.'}),
+    h('div',{class:'note',text:ready?'Payments are handled securely by '+(MEMBERSHIP.provider==='lemonsqueezy'?'Lemon Squeezy':'Gumroad')+'. Cancel any time from your receipt email.':'Payments are not set up yet.'})])}
+const isResponder=()=>{const l=lic();return !!(l&&l.responder&&plan()!=='free')};
+const frOn=()=>!SHARED&&isResponder()&&LS.get('fr',true)!==false;
+const incident=()=>{const v=LS.get('incident',{});return {name:String(v.name||''),num:String(v.num||'')}};
+const incidentLabel=()=>{const i=incident();return i.name+(i.num?' #'+i.num:'')};
+async function sendMsg(kind,data){
+  const body={kind,...data,plan:plan(),app:'Ridgeline',device:navigator.userAgent.slice(0,160),time:new Date().toISOString()};
+  if(SHARED&&dbh){try{await dbh.collection('feedback').doc(newId()).set({...body,by:uid,ts:Date.now()});return {ok:true}}catch(e){return {ok:false,how:'error'}}}
+  if(CONTACT.formUrl){try{const r=await fetch(CONTACT.formUrl,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body)});if(r.ok)return {ok:true}}catch(e){}
+    const ob=LS.get('outbox',[]);ob.push(body);LS.set('outbox',ob.slice(-20));return {ok:false,how:'queued'}}
+  return {ok:false,how:CONTACT.email?'email':'none',text:Object.entries(body).map(([k,v])=>k+': '+v).join('\n')}}
+async function flushOutbox(){if(!CONTACT.formUrl||!navigator.onLine)return;const ob=LS.get('outbox',[]);if(!ob.length)return;const left=[];
+  for(const b of ob){try{const r=await fetch(CONTACT.formUrl,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(b)});if(!r.ok)left.push(b)}catch(e){left.push(b)}}LS.set('outbox',left)}
+setTimeout(flushOutbox,6000);window.addEventListener('online',flushOutbox);
+function sentResult(res,out,okMsg){
+  if(res.ok){closeSheet();toast(okMsg);return}
+  if(res.how==='queued'){closeSheet();toast('No connection. It will send automatically when you are back online.');return}
+  if(res.how==='email'||res.how==='none'){const ta=h('textarea',{class:'in',rows:'5',readonly:''});ta.value=res.text;
+    out.replaceChildren(h('div',{class:'stat',text:res.how==='email'?'Please email this to '+CONTACT.email+'. Copy it with the button below.':'Sending is not set up in this copy of Ridgeline yet. Copy the text and send it to the person who shared the app with you.'}),
+      res.how==='email'?h('div',{class:'stat',style:'user-select:all;font-weight:600',text:CONTACT.email}):null,ta,h('div',{class:'row'},h('button',{class:'btn',text:'Copy text',onclick:()=>copyText(res.text,ta)})));return}
+  out.textContent='Could not send. Try again in a moment.'}
+let fbKind='idea';
+function openFeedback(){
+  const txt=h('textarea',{class:'in',rows:'5',maxlength:'2000',placeholder:'What would make Ridgeline better for you?','aria-label':'Your feedback'}),em=h('input',{class:'in',type:'email',maxlength:'120',placeholder:'Email, if you would like a reply (optional)','aria-label':'Your email'}),out=h('div',{}),kr=h('div',{class:'row'});
+  const dk=()=>kr.replaceChildren(...[['idea','Feature idea'],['problem','Something is wrong'],['other','Other']].map(([k,l])=>h('button',{class:'chip','aria-pressed':String(fbKind===k),text:l,onclick:()=>{fbKind=k;dk()}})));dk();
+  const send=h('button',{class:'btn primary',text:'Send',onclick:async()=>{if(txt.value.trim().length<3){out.textContent='Write a few words first.';return}send.disabled=true;out.textContent='Sending…';
+    const res=await sendMsg('feedback',{type:fbKind,message:txt.value.trim(),reply_to:em.value.trim()});send.disabled=false;if(!res.ok&&res.how!=='queued')out.textContent='';sentResult(res,out,'Thank you! Your feedback was sent.')}});
+  openSheet([h('h2',{text:'Feedback and ideas'}),h('div',{class:'stat',text:'Suggest a feature or tell us what is not working. Every message is read.'}),kr,txt,em,out,
+    h('div',{class:'row'},send,h('button',{class:'btn',text:'Close',onclick:closeSheet})),
+    h('div',{class:'note',text:'Sent with your message: your plan and device type, to help fix problems. Not sent: your location, pins or photos.'})])}
+let vrRole='SAR';
+function openVerify(){
+  const nm=h('input',{class:'in',maxlength:'80',placeholder:'Full name','aria-label':'Full name'}),ag=h('input',{class:'in',maxlength:'120',placeholder:'Agency or team, like Lake County SAR','aria-label':'Agency'}),
+    em=h('input',{class:'in',type:'email',maxlength:'120',placeholder:'Official agency email','aria-label':'Agency email'}),nt=h('textarea',{class:'in',rows:'3',maxlength:'600',placeholder:'Anything else, like a supervisor or team leader we can confirm with (optional)','aria-label':'Notes'}),out=h('div',{}),rr=h('div',{class:'row'});
+  const dr=()=>rr.replaceChildren(...['SAR','Fire','EMS','Law enforcement','Emergency management','Other'].map(k=>h('button',{class:'chip','aria-pressed':String(vrRole===k),text:k,onclick:()=>{vrRole=k;dr()}})));dr();
+  const send=h('button',{class:'btn primary',text:'Request verification',onclick:async()=>{
+    if(!nm.value.trim()||!ag.value.trim()||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em.value.trim())){out.textContent='Fill in your name, agency and a valid agency email.';return}
+    send.disabled=true;out.textContent='Sending…';const res=await sendMsg('verification',{name:nm.value.trim(),agency:ag.value.trim(),role:vrRole,email:em.value.trim(),notes:nt.value.trim()});send.disabled=false;if(!res.ok&&res.how!=='queued')out.textContent='';
+    sentResult(res,out,'Request sent. Watch your agency email for your free First Responder key.')}});
+  openSheet([h('h2',{text:'First responder verification'}),h('div',{class:'stat',text:'For search and rescue, fire, EMS, law enforcement and emergency management. Once your agency email is confirmed, you get a free First Responder key by email. Enter it under See plans, then Already paid.'}),
+    h('div',{class:'lbl',text:'Role'}),rr,nm,ag,em,nt,out,h('div',{class:'row'},send,h('button',{class:'btn',text:'Close',onclick:closeSheet})),
+    h('div',{class:'note',text:'Use your official agency address, not a personal one. Do not send photos of ID cards or badges.'})])}
+function responderSection(){
+  if(SHARED)return [];
+  if(!isResponder())return [h('div',{class:'lbl',text:'First responder'}),h('div',{class:'note',text:'Verified responders get Pro free, plus responder mode: USNG grid coordinates, 24-hour times, incident names on exports and an incident log.'}),h('div',{class:'row'},h('button',{class:'btn',text:'Request verification',onclick:openVerify}),h('button',{class:'btn',text:'I have a key',onclick:openPlans}))];
+  const on=frOn(),i=incident(),inName=h('input',{class:'in',maxlength:'80',placeholder:'Incident name','aria-label':'Incident name'}),inNum=h('input',{class:'in',maxlength:'40',placeholder:'Incident number (optional)','aria-label':'Incident number'});inName.value=i.name;inNum.value=i.num;
+  const save=()=>{LS.set('incident',{name:inName.value.trim(),num:inNum.value.trim()})};inName.addEventListener('change',save);inNum.addEventListener('change',save);
+  return [h('div',{class:'lbl',text:'First responder'}),h('div',{class:'row'},h('button',{class:'chip','aria-pressed':String(on),text:on?'Responder mode on':'Responder mode off',onclick:()=>{LS.set('fr',!on);redraw();openMenu()}})),
+    on?h('div',{},inName,h('div',{style:'height:6px'}),inNum,h('div',{class:'row'},h('button',{class:'btn',text:'Export incident log (CSV)',onclick:()=>{save();exportIncident()}}))):null]}
+function exportIncident(){
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"',i=incident(),list=[...features.values()].sort((a,b)=>(a.ts||0)-(b.ts||0));
+  const typeOf=f=>f.type==='pin'?(KINDS[f.kind]||KINDS.waypoint).l:f.type==='sector'?'Search sector':f.type==='area'?'Area':f.kind==='route'?'Route':'Track';
+  const t24=ms=>{if(!ms)return '';const d=new Date(ms),z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes())};
+  const rows=[['Incident','Number','Time','Seen','Type','Name','Reported by','Team','Status','Latitude','Longitude','USNG','Notes'].map(q).join(',')];
+  for(const f of list)rows.push([i.name,i.num,t24(f.ts),t24(f.seen),typeOf(f),f.kind==='checkin'?'Check-in':f.name,f.who,teamName(f.team),f.type==='sector'?(STATUS[f.status]||STATUS.todo).l:'',f.la.toFixed(6),f.lo.toFixed(6),usng(f.la,f.lo),f.note].map(q).join(','));
+  if(rows.length<2){toast('Nothing to export yet.');return}
+  saveFile('incident-log'+(i.num?'-'+i.num.replace(/[^\w-]+/g,''):'')+'.csv',rows.join('\r\n')+'\r\n')}
+function membershipSection(){if(SHARED||!MEMBERSHIP.paywall)return [];return [h('div',{class:'lbl',text:'Membership'}),h('div',{class:'row'},h('span',{class:'stat',style:'align-self:center',text:'Ridgeline '+planName(plan())}),h('button',{class:'btn',text:plan()==='pro'?'Manage':'See plans',onclick:openPlans}))]}
+setTimeout(recheck,4000);
+/* 3D terrain view */
+const V3={on:false,grid:null,yaw:0,pitch:45,zoom:1,ex:1.5,dirty:false,cx:0,cy:0,sc:1,D:1,w:0,h:0};
+const cv3=$('#cv3'),c3=cv3.getContext('2d');
+const msg3=t=>{$('#v3msg').textContent=t};
+const RAMP=[[0,[62,118,70]],[.3,[132,158,88]],[.55,[176,150,104]],[.78,[146,134,126]],[1,[238,238,236]]];
+function ramp(t){t=Math.max(0,Math.min(1,t));for(let i=1;i<RAMP.length;i++)if(t<=RAMP[i][0]){const [a,ca]=RAMP[i-1],[b,cb]=RAMP[i],k=(t-a)/(b-a||1);return ca.map((v,n)=>v+(cb[n]-v)*k)}return RAMP[RAMP.length-1][1]}
+function size3(){const r=cv3.getBoundingClientRect(),dp=window.devicePixelRatio||1;V3.w=r.width;V3.h=r.height;cv3.width=Math.round(r.width*dp);cv3.height=Math.round(r.height*dp);c3.setTransform(dp,0,0,dp,0,0);V3.cx=r.width/2;V3.cy=r.height*.52}
+function exChips(){$('#v3ex').replaceChildren(...[1,1.5,2,3].map(x=>h('button',{class:'chip','aria-pressed':String(V3.ex===x),text:x+'×',onclick:()=>{V3.ex=x;exChips();req3()}})))}
+function open3D(){
+  if(SHARED){toast('3D needs elevation data, which this shared page cannot load. Use the Ridgeline app or file.');return}
+  if(!can('d3')){upsell('d3');return}
+  const ext=Math.max(W,H)*view.mpp;
+  if(ext<1000){toast('Zoom out a little for 3D. The elevation data is too coarse for very small areas.');return}
+  if(ext>40000){toast('Zoom in for 3D. It shows areas up to about 25 miles across.');return}
+  $('#v3d').hidden=false;V3.on=true;V3.yaw=0;V3.pitch=45;V3.zoom=1;size3();exChips();
+  const tl=fromXY(0,0),br=fromXY(W,H),nx=36,ny=Math.max(12,Math.min(54,Math.round(36*H/W))),key=[tl,br].flat().map(v=>v.toFixed(4)).join(',');
+  if(V3.grid&&V3.grid.key===key){msg3('');req3();return}
+  V3.grid=null;msg3('Loading terrain…');$('#v3info').textContent='';req3();
+  const pts=[];for(let i=0;i<=ny;i++)for(let j=0;j<=nx;j++)pts.push([tl[0]-(tl[0]-br[0])*i/ny,tl[1]+(br[1]-tl[1])*j/nx]);
+  elevFetch(pts).then(e=>{if(!V3.on)return;if(!e||e.some(v=>v==null)){msg3('Could not load elevation. 3D needs an internet connection.');return}
+    let mn=Infinity,mx=-Infinity;for(const v of e){if(v<mn)mn=v;if(v>mx)mx=v}
+    const lac=(tl[0]+br[0])/2,loc=(tl[1]+br[1])/2,kx=111320*Math.cos(lac*rad);
+    V3.grid={key,la1:tl[0],la0:br[0],lo0:tl[1],lo1:br[1],nx,ny,e,mn,mx,lac,loc,kx,wM:(br[1]-tl[1])*kx,hM:(tl[0]-br[0])*111320};
+    msg3('');$('#v3info').textContent='Highest '+fmtElev(mx)+' · lowest '+fmtElev(mn)+' · drag to turn and tilt, pinch to zoom';req3()})}
+function close3D(){V3.on=false;$('#v3d').hidden=true;redraw()}
+function req3(){if(!V3.dirty){V3.dirty=true;requestAnimationFrame(draw3)}}
+function elevAt3(la,lo){const g=V3.grid;const fx=(lo-g.lo0)/(g.lo1-g.lo0)*g.nx,fy=(g.la1-la)/(g.la1-g.la0)*g.ny;if(fx<0||fy<0||fx>g.nx||fy>g.ny)return null;
+  const j=Math.min(g.nx-1,Math.floor(fx)),i=Math.min(g.ny-1,Math.floor(fy)),u=fx-j,v=fy-i,E=(a,b)=>g.e[a*(g.nx+1)+b];
+  return E(i,j)*(1-u)*(1-v)+E(i,j+1)*u*(1-v)+E(i+1,j)*(1-u)*v+E(i+1,j+1)*u*v}
+function proj3(la,lo,el){const g=V3.grid,x=(lo-g.loc)*g.kx,y=(la-g.lac)*111320,z=(el-(g.mn+g.mx)/2)*V3.ex,cy=Math.cos(V3.yaw*rad),sy=Math.sin(V3.yaw*rad),X=x*cy-y*sy,Y=x*sy+y*cy,p=V3.pitch*rad;
+  const dep=Y*Math.cos(p)-z*Math.sin(p),sy2=-(Y*Math.sin(p)+z*Math.cos(p)),f=V3.D/(V3.D+dep);return [V3.cx+X*f*V3.sc,V3.cy+sy2*f*V3.sc,dep]}
+function draw3(){
+  V3.dirty=false;if(!V3.on)return;const C=c3,w=V3.w,hh=V3.h;C.clearRect(0,0,w,hh);C.fillStyle=css('--map');C.fillRect(0,0,w,hh);
+  const g=V3.grid;if(!g)return;const big=Math.max(g.wM,g.hM);V3.sc=Math.min(w,hh)/big*.9*V3.zoom;V3.D=big*2.2;
+  const N1=g.nx+1,P=new Array(g.e.length);for(let i=0;i<=g.ny;i++)for(let j=0;j<=g.nx;j++)P[i*N1+j]=proj3(g.la1-(g.la1-g.la0)*i/g.ny,g.lo0+(g.lo1-g.lo0)*j/g.nx,g.e[i*N1+j]);
+  const cw=g.wM/g.nx,ch=g.hM/g.ny,L=[-.5,.55,.67],rg=(g.mx-g.mn)||1,tris=[];
+  for(let i=0;i<g.ny;i++)for(let j=0;j<g.nx;j++){const a=i*N1+j,b=a+1,c=a+N1,d=c+1,E=g.e,gx=((E[b]-E[a])+(E[d]-E[c]))/2/cw*V3.ex,gy=((E[a]-E[c])+(E[b]-E[d]))/2/ch*V3.ex,nl=Math.hypot(gx,gy,1);
+    const sh=.38+.62*Math.max(0,(-gx*L[0]-gy*L[1]+L[2])/nl),col=ramp(((E[a]+E[b]+E[c]+E[d])/4-g.mn)/rg).map(v=>Math.round(v*sh)),fs='rgb('+col.join(',')+')';
+    tris.push([P[a],P[b],P[c],fs],[P[b],P[d],P[c],fs])}
+  for(const t of tris)t[4]=(t[0][2]+t[1][2]+t[2][2])/3;tris.sort((x,y)=>y[4]-x[4]);
+  C.lineWidth=.6;C.lineJoin='round';for(const t of tris){C.beginPath();C.moveTo(t[0][0],t[0][1]);C.lineTo(t[1][0],t[1][1]);C.lineTo(t[2][0],t[2][1]);C.closePath();C.fillStyle=t[3];C.fill();C.strokeStyle=t[3];C.stroke()}
+  const line=(pts,close,col,wd,dash)=>{const q=close?pts.concat([pts[0]]):pts,out=[];for(let k=1;k<q.length;k++){const n=Math.max(1,Math.ceil(hav(q[k-1],q[k])/(Math.min(cw,ch)/2)));for(let m=0;m<=n;m++){const la=q[k-1][0]+(q[k][0]-q[k-1][0])*m/n,lo=q[k-1][1]+(q[k][1]-q[k-1][1])*m/n,z=elevAt3(la,lo);out.push(z==null?null:proj3(la,lo,z+3/V3.ex))}}
+    C.beginPath();let pen=false;for(const o of out){if(!o){pen=false;continue}pen?C.lineTo(o[0],o[1]):C.moveTo(o[0],o[1]);pen=true}C.setLineDash(dash||[]);C.lineWidth=wd;C.strokeStyle=col;C.stroke();C.setLineDash([])};
+  const lab=(t,x,y)=>{C.font='600 13px Barlow,system-ui,sans-serif';C.textAlign='center';C.lineWidth=4;C.strokeStyle='rgba(0,0,0,.7)';C.strokeText(t,x,y);C.fillStyle='#fff';C.fillText(t,x,y)};
+  for(const f of features.values()){if(f.type==='area'&&f.pts.length>2)line(f.pts,true,AREA_C,3,[12,5]);else if(f.type==='sector'&&f.pts.length>2)line(f.pts,true,(STATUS[f.status]||STATUS.todo).c,3);else if(f.type==='track'&&f.pts.length>1)line(f.pts,false,f.kind==='route'?css('--accent'):(tmOf(f.team)?tmOf(f.team).c:css('--crew')),4,f.kind==='route'?[10,6]:null)}
+  for(const f of features.values()){if(f.type!=='pin'||!shown(f))continue;const z=elevAt3(f.la,f.lo);if(z==null)continue;const [x,y]=proj3(f.la,f.lo,z),k=KINDS[f.kind]||KINDS.waypoint,tm=tmOf(f.team),ci=f.kind==='checkin'&&tm;
+    C.beginPath();C.moveTo(x,y);C.lineTo(x,y-26);C.lineWidth=2;C.strokeStyle='#fff';C.stroke();C.beginPath();C.arc(x,y-34,11,0,7);C.fillStyle=ci?tm.c:k.c;C.fill();C.lineWidth=2.5;C.stroke();
+    C.fillStyle='#fff';C.font='700 12px Barlow,system-ui,sans-serif';C.textAlign='center';C.textBaseline='middle';C.fillText(ci?tm.g:k.g,x,y-33);C.textBaseline='alphabetic';lab(f.kind==='checkin'?(f.who||'Check-in'):f.name,x,y-50)}
+  if(me){const z=elevAt3(me.la,me.lo);if(z!=null){const [x,y]=proj3(me.la,me.lo,z);C.beginPath();C.arc(x,y,7,0,7);C.fillStyle=css('--crew');C.fill();C.lineWidth=3;C.strokeStyle='#fff';C.stroke()}}
+  const o=proj3(g.lac,g.loc,g.mn),nn=proj3(g.lac+.001,g.loc,g.mn),ang=Math.atan2(nn[0]-o[0],-(nn[1]-o[1])),bx=w-34,by=78;
+  C.save();C.translate(bx,by);C.beginPath();C.arc(0,0,20,0,7);C.fillStyle=css('--panel');C.fill();C.rotate(ang);C.beginPath();C.moveTo(0,-15);C.lineTo(6,4);C.lineTo(-6,4);C.closePath();C.fillStyle='#D63A2F';C.fill();C.restore();
+  C.font='700 12px Barlow,system-ui,sans-serif';C.textAlign='center';C.fillStyle=css('--ink');C.fillText('N',bx+Math.sin(ang)*30,by-Math.cos(ang)*30+4)}
+{const pp=new Map();let last=null;
+  cv3.addEventListener('pointerdown',e=>{cv3.setPointerCapture(e.pointerId);pp.set(e.pointerId,[e.offsetX,e.offsetY]);last=null});
+  cv3.addEventListener('pointermove',e=>{if(!pp.has(e.pointerId))return;const prev=pp.get(e.pointerId);pp.set(e.pointerId,[e.offsetX,e.offsetY]);
+    if(pp.size===1){V3.yaw-=(e.offsetX-prev[0])*.4;V3.pitch=Math.max(12,Math.min(89,V3.pitch+(e.offsetY-prev[1])*.3));req3()}
+    else if(pp.size===2){const [a,b]=[...pp.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(last)V3.zoom=Math.max(.5,Math.min(5,V3.zoom*d/last));last=d;req3()}});
+  const up=e=>{pp.delete(e.pointerId);last=null};cv3.addEventListener('pointerup',up);cv3.addEventListener('pointercancel',up);
+  cv3.addEventListener('wheel',e=>{e.preventDefault();V3.zoom=Math.max(.5,Math.min(5,V3.zoom*Math.exp(-e.deltaY*.0015)));req3()},{passive:false});
+  new ResizeObserver(()=>{if(V3.on){size3();req3()}}).observe(cv3)}
+$('#v3dBtn').addEventListener('click',open3D);$('#v3close').addEventListener('click',close3D);$('#v3reset').addEventListener('click',()=>{V3.yaw=0;V3.pitch=45;V3.zoom=1;req3()});
+if(SHARED)$('#v3dBtn').hidden=true;
+function terrainSection(){
+  if(SHARED)return [h('div',{class:'lbl',text:'Terrain'}),h('div',{class:'note',text:'Elevation, steepness and terrain-aware projections work in the saved file. This shared page cannot load elevation.'})];
+  const b=h('button',{class:'chip','aria-pressed':String(slopeOn),text:'Show steepness on the map',onclick:()=>{if(!can('terrain')){upsell('terrain');return}slopeOn=!slopeOn;LS.set('slope',slopeOn);b.setAttribute('aria-pressed',String(slopeOn));if(slopeOn){sGrid=null;toast('Loading steepness for this area…')}redraw()}});
+  return [h('div',{class:'lbl',text:'Terrain'}),h('div',{class:'row'},b),h('div',{class:'note',text:'Shades steep ground from yellow (10–20°) to purple (over 40°). Uses elevation data about 90 m across, so it needs an internet connection and misses small cliffs. The cross shows its elevation at the bottom left. Use the Relief map background for shaded hills.'})]}
+function bgSection(){
+  if(SHARED)return [h('div',{class:'lbl',text:'Map background'}),h('div',{class:'note',text:'Satellite and topo maps work in the saved file. This shared page cannot load map images.'})];
+  const row=h('div',{class:'row'});
+  const dr=()=>row.replaceChildren(...[['grid','Grid'],['sat','Satellite'],['hybrid','Hybrid'],['topo','Topo'],['relief','Relief']].map(([k,l])=>h('button',{class:'chip','aria-pressed':String(bg===k),text:l,onclick:()=>{bg=k;LS.set('bg',k);dr();redraw()}})));dr();
+  return [h('div',{class:'lbl',text:'Map background'}),row,h('div',{class:'row'},h('button',{class:'btn',text:'Save this area for offline',onclick:openOffline})),h('div',{class:'note',text:'Satellite and topo cover the US and need a connection unless you save the area first.'})]}
+
+/* map canvas */
+const cv=$('#cv'),ctx=cv.getContext('2d');
+function resize(){const r=$('#mapwrap').getBoundingClientRect();if(!r.width)return;dpr=window.devicePixelRatio||1;W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);redraw()}
+new ResizeObserver(resize).observe($('#mapwrap'));
+function redraw(){if(!dirty){dirty=true;requestAnimationFrame(draw)}}
+const STEPS_M=[10,25,50,100,250,500,1000,2500,5000,10000,25000,50000,100000];
+const STEPS_I=[100,200,500,1000,2640,5280,10560,26400,52800,105600,264000,528000].map(f=>f/3.28084);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+/* terrain */
+const fmtElev=m=>units==='imp'?Math.round(m*3.28084).toLocaleString()+' ft':Math.round(m)+' m';
+const eCache=new Map(),ek=q=>q[0].toFixed(4)+','+q[1].toFixed(4);
+async function elevFetch(pts){
+  if(SHARED)return null;
+  const need=[...new Map(pts.filter(q=>!eCache.has(ek(q))).map(q=>[ek(q),q])).values()];
+  try{for(let i=0;i<need.length;i+=100){const c=need.slice(i,i+100);
+    const r=await fetch('https://api.open-meteo.com/v1/elevation?latitude='+c.map(q=>q[0].toFixed(4)).join(',')+'&longitude='+c.map(q=>q[1].toFixed(4)).join(','));
+    if(!r.ok)throw new Error('http');const j=await r.json();if(!Array.isArray(j.elevation)||j.elevation.length!==c.length)throw new Error('shape');
+    c.forEach((q,n)=>eCache.set(ek(q),j.elevation[n]))}}catch(e){return null}
+  return pts.map(q=>eCache.get(ek(q)))}
+const slopeCol=deg=>deg<10?null:deg<20?'#E5C100':deg<30?'#F08A24':deg<40?'#D63A2F':'#8E24AA';
+const smooth=e=>e.map((v,i)=>{const a=e[Math.max(0,i-1)],b=e[Math.min(e.length-1,i+1)];return (a+v*2+b)/4});
+function sampleAlong(pts,n){const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+hav(pts[i-1],pts[i]));const tot=cum[cum.length-1],out=[],ds=[];let j=1;
+  for(let k=0;k<n;k++){const d=tot*k/(n-1);while(j<pts.length-1&&cum[j]<d)j++;const a=pts[j-1],b=pts[j],sg=(cum[j]-cum[j-1])||1,t=Math.min(1,Math.max(0,(d-cum[j-1])/sg));out.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);ds.push(d)}return{pts:out,ds,tot}}
+function drawProfile(cv,ds,e){
+  const dp=window.devicePixelRatio||1,w=cv.clientWidth,hh=cv.clientHeight;if(!w)return;cv.width=w*dp;cv.height=hh*dp;const c=cv.getContext('2d');c.setTransform(dp,0,0,dp,0,0);
+  const mn=Math.min(...e),mx=Math.max(...e),rg=Math.max(20,mx-mn),pl=4,pr=4,pt=16,pb=18,tot=ds[ds.length-1]||1,X=d=>pl+(w-pl-pr)*d/tot,Y=z=>pt+(hh-pt-pb)*(1-(z-mn)/rg);
+  c.fillStyle=css('--bg');c.fillRect(0,0,w,hh);
+  for(let i=1;i<e.length;i++){const dx=(ds[i]-ds[i-1])||1,deg=Math.atan(Math.abs(e[i]-e[i-1])/dx)/rad,col=slopeCol(deg)||css('--good');
+    c.beginPath();c.moveTo(X(ds[i-1]),Y(e[i-1]));c.lineTo(X(ds[i]),Y(e[i]));c.lineTo(X(ds[i]),hh-pb);c.lineTo(X(ds[i-1]),hh-pb);c.closePath();c.fillStyle=col+'55';c.fill();
+    c.beginPath();c.moveTo(X(ds[i-1]),Y(e[i-1]));c.lineTo(X(ds[i]),Y(e[i]));c.lineWidth=3;c.strokeStyle=col;c.stroke()}
+  c.fillStyle=css('--muted');c.font='12px Barlow,system-ui,sans-serif';c.textAlign='left';c.fillText(fmtElev(mx),pl+2,12);c.fillText(fmtElev(mn),pl+2,hh-4);c.textAlign='right';c.fillText(fmtDist(tot),w-pr-2,hh-4)}
+let ceT=null,ceK='';
+function crossElev(){const el=$('#elev');if(SHARED||!can('terrain')){el.hidden=true;ceK='';return}const k=ek([view.lat,view.lon]);if(k===ceK)return;ceK=k;el.style.opacity='.5';clearTimeout(ceT);
+  ceT=setTimeout(async()=>{const e=await elevFetch([[view.lat,view.lon]]);if(e&&e[0]!=null&&k===ceK){el.textContent='Cross: '+fmtElev(e[0])+' elevation';el.hidden=false;el.style.opacity='1'}},600)}
+let slopeOn=!SHARED&&!!LS.get('slope',false),sGrid=null,sTimer=null,sBusy=false,sMsg='';
+const SN=16;
+function slopeNeed(){
+  if(!slopeOn||SHARED||!W||!can('terrain'))return false;const ext=W*view.mpp;
+  if(ext>25000){sMsg='zoom in to see steepness';return false}if(ext<1100){sMsg='zoom out a little to see steepness';return false}
+  sMsg='';if(!sGrid)return true;const q=view.mpp/sGrid.mpp;if(q<.7||q>1.4)return true;
+  return Math.abs(view.lat-(sGrid.la0+sGrid.la1)/2)>(sGrid.la1-sGrid.la0)*.2||Math.abs(view.lon-(sGrid.lo0+sGrid.lo1)/2)>(sGrid.lo1-sGrid.lo0)*.2}
+function slopeSched(){if(!slopeNeed())return;clearTimeout(sTimer);sTimer=setTimeout(slopeLoad,700)}
+async function slopeLoad(){
+  if(sBusy||!slopeNeed())return;sBusy=true;
+  try{const tl=fromXY(-W*.25,-H*.25),br=fromXY(W*1.25,H*1.25),la1=tl[0],la0=br[0],lo0=tl[1],lo1=br[1],ny=Math.max(6,Math.round(SN*H/W)),pts=[];
+    for(let i=0;i<=ny;i++)for(let j=0;j<=SN;j++)pts.push([la1-(la1-la0)*i/ny,lo0+(lo1-lo0)*j/SN]);
+    const e=await elevFetch(pts);
+    if(e&&!e.some(v=>v==null)){const cw=(lo1-lo0)*Math.cos(view.lat*rad)*111320/SN,ch=(la1-la0)*111320/ny,deg=[];
+      for(let i=0;i<ny;i++)for(let j=0;j<SN;j++){const a=e[i*(SN+1)+j],b=e[i*(SN+1)+j+1],c=e[(i+1)*(SN+1)+j],d=e[(i+1)*(SN+1)+j+1],gx=((b+d)-(a+c))/(2*cw),gy=((a+b)-(c+d))/(2*ch);deg.push(Math.atan(Math.hypot(gx,gy))/rad)}
+      sGrid={la0,la1,lo0,lo1,mpp:view.mpp,ny,deg}}
+    else toast('Could not load elevation for the steepness layer. It needs an internet connection.')}
+  finally{sBusy=false;redraw()}}
+const tCache=new Map();
+function terrainFor(last,bear){
+  const k=last[0].toFixed(4)+','+last[1].toFixed(4)+','+Math.round(bear/5),c=tCache.get(k);
+  if(c&&c.e)return c;if(SHARED||(c&&Date.now()-c.t<60000))return null;
+  tCache.set(k,{t:Date.now()});const pts=[...Array(81).keys()].map(i=>dest(last,bear,i*100));
+  elevFetch(pts).then(e=>{tCache.set(k,e&&!e.some(v=>v==null)?{e:smooth(e),t:Date.now()}:{t:Date.now()});redraw()});return null}
+function terrainDist(e,v,el){let t=0,d=0;const k0=Math.exp(-3.5*.05);
+  for(let i=1;i<e.length;i++){const sl=(e[i]-e[i-1])/100,f=Math.max(.05,Math.exp(-3.5*Math.abs(sl+.05))/k0),seg=100/(v*f);if(t+seg>=el)return d+100*(el-t)/seg;t+=seg;d+=100}
+  return d+v*(el-t)}
+const PROJ=Object.assign({on:true,spd:1.5,cone:25},LS.get('proj',{}));
+const PCOL=['#C0392B','#2563B8','#2F8F4E','#8250B0','#D9780F','#1E8A94','#C2185B','#B8860B'];
+const hashI=str=>{let x=0;for(const c of String(str))x=(x*31+c.charCodeAt(0))>>>0;return x};
+const signT=f=>f.seen||f.ts||0;
+function dest(a,brg,d){const b=brg*rad,la=a[0]+d*Math.cos(b)/111320,lo=a[1]+d*Math.sin(b)/(111320*Math.max(.05,Math.cos(a[0]*rad)));return [la,lo]}
+function projGroups(){
+  const by=new Map();
+  for(const f of features.values()){if(f.type!=='pin'||(f.kind!=='lkp'&&f.kind!=='clue'))continue;const k=f.by||f.who||'?';if(!by.has(k))by.set(k,[]);by.get(k).push(f)}
+  const out=[],now=Date.now();let i=0;
+  for(const [k,fs] of by){if(fs.length<2)continue;fs.sort((a,b)=>signT(a)-signT(b));
+    const pts=fs.map(f=>[f.la,f.lo]),n=pts.length,last=pts[n-1];
+    let vx=0,vy=0;for(let j=Math.max(1,n-2);j<n;j++){const d=hav(pts[j-1],pts[j]),b=bearing(pts[j-1],pts[j])*rad;vx+=d*Math.sin(b);vy+=d*Math.cos(b)}
+    if(Math.hypot(vx,vy)<1){i++;continue}
+    const bear=((Math.atan2(vx,vy)/rad)+360)%360,span=(signT(fs[n-1])-signT(fs[0]))/1000,len=pathLen(pts);
+    const fromData=span>=600&&len>20,v=fromData?Math.min(1.5,Math.max(.05,len/span)):PROJ.spd/3.6;
+    const el=Math.max(0,(now-signT(fs[n-1]))/1000),flat=Math.min(15000,Math.max(150,v*el));let dist=flat,terr=null;
+    const tc=terrainFor(last,bear);
+    if(tc){dist=Math.min(15000,Math.max(150,terrainDist(tc.e,v,el)));let steep=null,maxDeg=0;const lim=Math.min(80,Math.ceil(dist/100)+2);
+      for(let q=1;q<=lim&&q<tc.e.length;q++){const dg=Math.atan(Math.abs(tc.e[q]-tc.e[q-1])/100)/rad;if(dg>maxDeg)maxDeg=dg;if(!steep&&dg>=35)steep={d:q*100,deg:dg}}
+      const ix=Math.min(80,dist/100),i0=Math.floor(ix),i1=Math.min(80,i0+1);terr={flat,steep,maxDeg,dz:tc.e[i0]+(tc.e[i1]-tc.e[i0])*(ix-i0)-tc.e[0]}}
+    const end=dest(last,bear,dist);
+    const tm=tmOf(fs[n-1].team)||tmOf(fs.map(f=>f.team).reverse().find(t=>tmOf(t)));out.push({key:k,who:fs[n-1].who||'Someone',team:tm,terr,fs,pts,last,bear,dist,end,v,fromData,el,color:tm?tm.c:PCOL[hashI(k)%PCOL.length]});i++}
+  return out}
+function openProj(){
+  if(!can('proj')){upsell('proj');return}
+  const on=h('button',{class:'chip','aria-pressed':String(PROJ.on),text:PROJ.on?'Projection on':'Projection off',onclick:()=>{PROJ.on=!PROJ.on;LS.set('proj',PROJ);openProj();redraw()}});
+  const sp=h('input',{type:'range',min:'5',max:'40',value:String(Math.round(PROJ.spd*10)),'aria-label':'Default travel speed'}),sl=h('div',{class:'stat'});
+  const um=units==='imp',fs=v=>um?(v/1.609).toFixed(1)+' mph':v.toFixed(1)+' km/h';
+  const upd=()=>{PROJ.spd=+sp.value/10;sl.textContent='Default travel speed: '+fs(PROJ.spd)};sp.addEventListener('input',upd);sp.addEventListener('change',()=>{LS.set('proj',PROJ);redraw();openProj()});upd();
+  const cn=h('input',{type:'range',min:'10',max:'60',value:String(PROJ.cone),'aria-label':'Spread'}),cl=h('div',{class:'stat'});
+  const updc=()=>{PROJ.cone=+cn.value;cl.textContent='Spread either side of the heading: '+PROJ.cone+'°'};cn.addEventListener('input',updc);cn.addEventListener('change',()=>{LS.set('proj',PROJ);redraw()});updc();
+  const gs=projGroups();
+  openSheet([h('h2',{text:'Projected routes'}),
+    h('div',{class:'stat',text:'Each person who logs two or more Last known points or Clues gets a line through them in time order, plus a cone showing where the subject could be by now if they kept heading the same way. The line takes the color of that person’s team, or its own color if they have no team.'}),
+    h('div',{class:'row'},on),
+    ...(gs.length?gs.map(g=>h('button',{class:'item',onclick:()=>{view.lat=g.last[0];view.lon=g.last[1];view.mpp=Math.max(view.mpp,g.dist/150);redraw();closeSheet()}},h('span',{style:'width:14px;height:14px;border-radius:50%;flex:none;background:'+g.color}),h('span',{},h('div',{style:'font-weight:600',text:g.who+(g.team?' · '+g.team.g+' '+g.team.l:'')+' · '+g.fs.length+' signs'}),h('div',{class:'m',text:'Heading '+octOf(g.bear)+' ('+Math.round(g.bear)+'°) · about '+fmtDist(g.dist)+' past the last sign · '+(g.fromData?'speed from your points':'default speed')+' · last sign '+ago(signT(g.fs[g.fs.length-1]))+(g.terr?' · adjusted for terrain (flat ground would be '+fmtDist(g.terr.flat)+') · ends about '+fmtElev(Math.abs(g.terr.dz))+(g.terr.dz>=0?' higher':' lower')+(g.terr.steep?' · very steep ground (over 35°) about '+fmtDist(g.terr.steep.d)+' ahead':g.terr.maxDeg>=25?' · steepest stretch ahead about '+Math.round(g.terr.maxDeg)+'°':''):'')})))):[h('div',{class:'card',text:'Nothing to project yet. Add two or more Last known points or Clues, and set when each was seen.'})]),
+    h('div',{class:'lbl',text:'Settings'}),sl,sp,cl,cn,
+    h('div',{class:'note',text:''+(SHARED?'This shared page cannot load elevation, so the distance assumes flat ground. In the saved file the projection slows down on steep ground and flags very steep terrain ahead. ':'The distance slows down on steep ground using elevation data about 90 m across, so small cliffs do not show. ')+'This is a planning estimate from a straight heading, not a prediction. Terrain, trails and the subject’s condition change where people go. Give it to the search leader as one input.'}),
+    h('div',{class:'row'},h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+setInterval(()=>{if(PROJ.on)redraw()},60000);
+function badge(x,y,t,rad){ctx.beginPath();ctx.arc(x,y,rad,0,7);ctx.fillStyle=t.c;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();ctx.fillStyle='#fff';ctx.font='700 '+Math.round(rad*(t.g.length>1?.95:1.15))+'px Barlow,system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t.g,x,y+1);ctx.textBaseline='alphabetic'}
+function draw(){
+  dirty=false;if(!W)return;
+  const C={bg:css('--map'),grid:css('--grid'),ink:css('--ink'),acc:css('--accent'),good:css('--good'),bad:css('--bad'),crew:css('--crew'),muted:css('--muted')};
+  ctx.clearRect(0,0,W,H);ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
+  const steps=units==='imp'?STEPS_I:STEPS_M,step=steps.find(s=>s/view.mpp>=70)||steps[steps.length-1];
+  const tl=fromXY(0,0),br=fromXY(W,H),dLa=step/111320,dLo=step/mLon();
+  const tiles=bg!=='grid'&&!!TILE[bg];calcLatest();
+  const txtAt=(t,x,y)=>{ctx.font='600 14px Barlow,system-ui,sans-serif';ctx.textAlign='center';if(tiles){ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText(t,x,y);ctx.fillStyle='#fff'}else ctx.fillStyle=C.ink;ctx.fillText(t,x,y)};
+  {ctx.lineWidth=1;ctx.strokeStyle=C.grid;ctx.beginPath();
+  let n=0;for(let la=Math.ceil(br[0]/dLa)*dLa;la<=tl[0]&&n<200;la+=dLa,n++){const y=Math.round(toXY(la,0)[1])+.5;ctx.moveTo(0,y);ctx.lineTo(W,y)}
+  n=0;for(let lo=Math.ceil(tl[1]/dLo)*dLo;lo<=br[1]&&n<200;lo+=dLo,n++){const x=Math.round(toXY(0,lo)[0])+.5;ctx.moveTo(x,0);ctx.lineTo(x,H)}
+  ctx.stroke()}
+  if(tiles)drawTiles();
+  if(slopeOn&&sGrid&&can('terrain')){const g=sGrid,cwl=(g.lo1-g.lo0)/SN,chl=(g.la1-g.la0)/g.ny;
+    for(let i=0;i<g.ny;i++)for(let j=0;j<SN;j++){const col=slopeCol(g.deg[i*SN+j]);if(!col)continue;const [x0,y0]=toXY(g.la1-chl*i,g.lo0+cwl*j),[x1,y1]=toXY(g.la1-chl*(i+1),g.lo0+cwl*(j+1));ctx.fillStyle=col+'73';ctx.fillRect(x0,y0,x1-x0+1,y1-y0+1)}}
+  // search sectors, routes and tracks, search rings
+  for(const f of features.values()){
+    if(f.type==='area'&&f.pts.length>2){ctx.beginPath();f.pts.forEach((q,i)=>{const [x,y]=toXY(q[0],q[1]);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath();ctx.fillStyle=AREA_C+'26';ctx.fill();ctx.setLineDash([12,5]);ctx.lineWidth=3;ctx.strokeStyle=AREA_C;ctx.stroke();ctx.setLineDash([]);const [cx,cy]=toXY(f.la,f.lo);txtAt(f.name+' · '+fmtArea(areaM2(f.pts)),cx,cy)}
+    else if(f.type==='sector'&&f.pts.length>2){const st=STATUS[f.status]||STATUS.todo;ctx.beginPath();f.pts.forEach((q,i)=>{const [x,y]=toXY(q[0],q[1]);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath();ctx.fillStyle=st.c+'40';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=st.c;ctx.stroke();const [cx,cy]=toXY(f.la,f.lo);txtAt(f.name+' · '+st.l,cx,cy);if(tmOf(f.team))badge(cx,cy-24,tmOf(f.team),14)}
+    else if(f.type==='track'&&f.pts.length>1){const planned=f.kind==='route';ctx.beginPath();f.pts.forEach((q,i)=>{const [x,y]=toXY(q[0],q[1]);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.lineJoin='round';ctx.lineWidth=4;ctx.strokeStyle=planned?C.acc:(tmOf(f.team)?tmOf(f.team).c:C.crew);ctx.setLineDash(planned?[10,6]:[]);ctx.stroke();ctx.setLineDash([]);if(view.mpp<120){const m=f.pts[Math.floor(f.pts.length/2)],[mx,my]=toXY(m[0],m[1]);txtAt(f.name+' · '+fmtDist(pathLen(f.pts)),mx,my-10)}}
+    else if(f.type==='pin'&&f.kind==='lkp'&&f.radius>0){const [x,y]=toXY(f.la,f.lo),r=f.radius/view.mpp;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=C.bad+'14';ctx.fill();ctx.setLineDash([10,6]);ctx.lineWidth=3;ctx.strokeStyle=C.bad;ctx.stroke();ctx.setLineDash([]);txtAt(fmtDist(f.radius),x,y-r-8)}}
+  if(PROJ.on&&can('proj'))for(const g of projGroups()){
+    ctx.beginPath();g.pts.forEach((q,j)=>{const [x,y]=toXY(q[0],q[1]);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.lineJoin='round';ctx.setLineDash([]);ctx.lineWidth=4;ctx.strokeStyle=g.color;ctx.stroke();
+    const [lx,ly]=toXY(g.last[0],g.last[1]),[ex,ey]=toXY(g.end[0],g.end[1]),rr=g.dist/view.mpp;
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.arc(lx,ly,rr,(g.bear-PROJ.cone-90)*rad,(g.bear+PROJ.cone-90)*rad);ctx.closePath();ctx.fillStyle=g.color+'30';ctx.fill();ctx.setLineDash([8,6]);ctx.lineWidth=2;ctx.strokeStyle=g.color;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(ex,ey);ctx.lineWidth=4;ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(ex,ey,8,0,7);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=g.color;ctx.stroke();
+    txtAt(g.who+(g.team?' ('+g.team.l+')':'')+' could be here · '+fmtDist(g.dist),ex,ey-16);
+    if(g.terr&&g.terr.steep&&g.terr.steep.d<=g.dist+300){const sp=dest(g.last,g.bear,g.terr.steep.d),[sx,sy]=toXY(sp[0],sp[1]);ctx.beginPath();ctx.arc(sx,sy,7,0,7);ctx.fillStyle='#8E24AA';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();txtAt('Very steep',sx,sy-12)}}
+  // scent cones: where a stand's scent travels
+  if(wind&&wind.mph>0)for(const f of features.values()){const ok=windOk(f);if(ok===null)continue;const [x,y]=toXY(f.la,f.lo),to=(wind.from+180)%360,L=Math.max(36,(60+wind.mph*12)/view.mpp);
+    ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,L,(to-28-90)*rad,(to+28-90)*rad);ctx.closePath();ctx.fillStyle=(ok?C.good:C.bad)+'44';ctx.fill()}
+  for(const f of features.values()){if(f.type!=='pin'||!shown(f))continue;const k=KINDS[f.kind]||KINDS.waypoint,[x,y]=toXY(f.la,f.lo),ok=windOk(f);
+    const tm=tmOf(f.team),ci=f.kind==='checkin'&&tm;ctx.beginPath();ctx.arc(x,y,17,0,7);ctx.fillStyle=ci?tm.c:k.c;ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=ok===null?'#ffffffdd':ok?C.good:C.bad;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='700 15px Barlow,system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(ci?tm.g:k.g,x,y+1);ctx.textBaseline='alphabetic';if(tm&&!ci)badge(x+14,y-14,tm,9);
+    const lab=f.kind==='checkin'?(f.who||'Check-in')+(tm?' ('+tm.l+')':'')+' · '+ago(f.ts):f.name;if((view.mpp<120||f.kind==='checkin'||f.kind==='lkp')&&lab)txtAt(lab,x,y+34)}
+  if(me){const [x,y]=toXY(me.la,me.lo),ar=Math.max(12,me.acc/view.mpp);ctx.beginPath();ctx.arc(x,y,ar,0,7);ctx.fillStyle=C.crew+'22';ctx.fill();ctx.beginPath();ctx.arc(x,y,8,0,7);ctx.fillStyle=tmOf(myTeam())?tmOf(myTeam()).c:C.crew;ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='#fff';ctx.stroke()}
+  if(draft&&draft.pts.length){ctx.beginPath();draft.pts.forEach((q,i)=>{const [x,y]=toXY(q[0],q[1]);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});if((draft.mode==='sector'||draft.mode==='area')&&draft.pts.length>2)ctx.closePath();ctx.setLineDash([8,5]);ctx.lineWidth=3;ctx.strokeStyle=C.acc;ctx.stroke();ctx.setLineDash([]);draft.pts.forEach(q=>{const [x,y]=toXY(q[0],q[1]);ctx.beginPath();ctx.arc(x,y,6,0,7);ctx.fillStyle=C.acc;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke()})}
+  if(draft&&draft.pts.length){const l=draft.pts[draft.pts.length-1],[lx,ly]=toXY(l[0],l[1]);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(W/2,H/2);ctx.setLineDash([3,6]);ctx.lineWidth=2;ctx.strokeStyle=C.acc;ctx.stroke();ctx.setLineDash([]);
+    if(draft.mode==='measure'){let d=0;draft.pts.forEach((q,i)=>{if(i){d+=hav(draft.pts[i-1],q);const [x,y]=toXY(q[0],q[1]);txtAt(fmtDist(d),x,y-14)}});const leg=hav(l,[view.lat,view.lon]);if(leg>1)txtAt('+'+fmtDist(leg)+' · '+Math.round(bearing(l,[view.lat,view.lon]))+'°',W/2,H/2-22)}}
+  if(rec&&rec.pts.length>1){ctx.beginPath();rec.pts.forEach((q,i)=>{const [x,y]=toXY(q[0],q[1]);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.setLineDash([2,6]);ctx.lineWidth=4;ctx.strokeStyle=C.crew;ctx.stroke();ctx.setLineDash([])}
+  // cross: where new pins and corners go
+  ctx.strokeStyle=C.acc;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(W/2-14,H/2);ctx.lineTo(W/2+14,H/2);ctx.moveTo(W/2,H/2-14);ctx.lineTo(W/2,H/2+14);ctx.stroke();ctx.beginPath();ctx.arc(W/2,H/2,9,0,7);ctx.stroke();
+  const barPx=step/view.mpp;if(tiles){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(16,H-76);ctx.lineTo(16+barPx,H-76);ctx.stroke()}ctx.strokeStyle=tiles?'#000':C.ink;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(16,H-76);ctx.lineTo(16+barPx,H-76);ctx.moveTo(16,H-81);ctx.lineTo(16,H-71);ctx.moveTo(16+barPx,H-81);ctx.lineTo(16+barPx,H-71);ctx.stroke();
+  $('#scale').textContent=fmtDist(step)+' per square';
+  const tm=$('#tilemsg'),showTm=!tmsgOff&&(SHARED||(tiles&&tOk===0&&tFail>=4));tm.hidden=!showTm;
+  if(showTm)$('#tilemsgT').textContent=SHARED?'This shared page cannot show satellite or topo maps, because claude.ai blocks map images. Pins, sectors, routes and chat still work. Open the Ridgeline file in a web browser to see the map.':'Map images are not loading. If you opened this inside the Claude app, open the file in Safari or Chrome instead. Otherwise check your internet connection.';
+  $('#hint').hidden=features.size>0||showTm;
+  $('#attrib').hidden=!tiles;if(tiles)$('#attrib').textContent=TILE[bg].a;
+  $('#slopeLeg').hidden=!(slopeOn&&can('terrain'));
+  {const fr=frOn(),cd=$('#coord');$('#frBadge').hidden=!fr;$('header h1').classList.toggle('fr',fr);cd.hidden=!fr;if(fr)cd.textContent='Cross '+usng(view.lat,view.lon)}$('#slopeMsg').textContent=sMsg?' · '+sMsg:'';slopeSched();crossElev();
+}
+function zoomAt(x,y,k){const g=fromXY(x,y);view.mpp=Math.min(2000,Math.max(0.3,view.mpp*k));const g2=fromXY(x,y);view.lat+=g[0]-g2[0];view.lon+=g[1]-g2[1];redraw()}
+const ptrs=new Map();let moved=false,startPt=null,lastPinch=null;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.offsetX,e.offsetY]);if(ptrs.size===1){startPt=[e.offsetX,e.offsetY];moved=false}else{moved=true;lastPinch=null}});
+cv.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;const prev=ptrs.get(e.pointerId),cur=[e.offsetX,e.offsetY];
+  if(ptrs.size===1){const dx=cur[0]-prev[0],dy=cur[1]-prev[1];if(!moved&&Math.hypot(cur[0]-startPt[0],cur[1]-startPt[1])>8)moved=true;if(moved){view.lon-=dx*view.mpp/mLon();view.lat+=dy*view.mpp/111320;redraw()}}
+  else if(ptrs.size===2){ptrs.set(e.pointerId,cur);const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]),mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];if(lastPinch){zoomAt(mid[0],mid[1],lastPinch.d/d);view.lon-=(mid[0]-lastPinch.mid[0])*view.mpp/mLon();view.lat+=(mid[1]-lastPinch.mid[1])*view.mpp/111320;redraw()}lastPinch={d,mid};return}
+  ptrs.set(e.pointerId,cur)});
+function endPtr(e){const was=ptrs.size,p=ptrs.get(e.pointerId);ptrs.delete(e.pointerId);lastPinch=null;if(was===1&&!moved&&p&&e.type==='pointerup')tap(p[0],p[1])}
+cv.addEventListener('pointerup',endPtr);cv.addEventListener('pointercancel',endPtr);
+cv.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.offsetX,e.offsetY,Math.exp(e.deltaY*0.0015))},{passive:false});
+setInterval(()=>LS.set('view',view),3000);
+function tap(x,y){
+  if(draft)return;calcLatest();
+  let best=null,bd=28;
+  for(const f of features.values()){if(f.type!=='pin'||!shown(f))continue;const [px,py]=toXY(f.la,f.lo),d=Math.hypot(px-x,py-y);if(d<=bd){bd=d;best=f}}
+  if(!best){bd=16;for(const f of features.values()){if(f.type!=='track')continue;const P=f.pts.map(q=>toXY(q[0],q[1]));for(let i=1;i<P.length;i++){const d=segDist(x,y,P[i-1],P[i]);if(d<=bd){bd=d;best=f}}}}
+  if(!best){for(const f of features.values()){if((f.type==='sector'||f.type==='area')&&f.pts.length>2&&inPoly(x,y,f.pts.map(q=>toXY(q[0],q[1])))){best=f;break}}}
+  if(best)openFeature(best.id)}
+$('#zin').addEventListener('click',()=>zoomAt(W/2,H/2,0.6));
+$('#zout').addEventListener('click',()=>zoomAt(W/2,H/2,1.6));
+$('#addBtn').addEventListener('click',openAdd);$('#savedBtn').addEventListener('click',openSaved);
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('keydown',e=>{const t=e.target&&e.target.tagName;if(t==='INPUT'||t==='TEXTAREA'||e.metaKey||e.ctrlKey||e.altKey)return;
+  if(V3.on){if(e.key==='Escape')close3D();return}
+  if(e.key==='Escape'&&$('#sheet').classList.contains('on')){closeSheet();return}
+  if($('#sheet').classList.contains('on')||!$('#map').classList.contains('on'))return;
+  const st=Math.min(W,H)*.25*view.mpp,k={'+':()=>zoomAt(W/2,H/2,.6),'=':()=>zoomAt(W/2,H/2,.6),'-':()=>zoomAt(W/2,H/2,1.6),'_':()=>zoomAt(W/2,H/2,1.6),ArrowUp:()=>{view.lat+=st/111320},ArrowDown:()=>{view.lat-=st/111320},ArrowLeft:()=>{view.lon-=st/mLon()},ArrowRight:()=>{view.lon+=st/mLon()}}[e.key];
+  if(k){e.preventDefault();k();redraw()}});
+$('#tilemsgX').addEventListener('click',()=>{tmsgOff=true;redraw()});
+
+/* place sheet */
+const PLACE_KINDS=['waypoint','trailhead','camp','water','hazard','stand','camera'];
+let draft=null,rec=null,wake=null;
+let markWait=null;
+function markHere(kind,photo){
+  if(me&&Date.now()-(me.t||Date.now())<60000){addPin(kind||'waypoint',[me.la,me.lo],photo);return}
+  if(SHARED){toast('GPS does not work in this shared page. The pin goes at the cross instead.');addPin(kind||'waypoint',null,photo);return}
+  if(!startWatch()){toast('Location is not available here. The pin goes at the cross instead.');addPin(kind||'waypoint',null,photo);return}
+  closeSheet();markWait={kind:kind||'waypoint',photo};followNext=true;toast('Getting your GPS position…')}
+function openAdd(){
+  const row=(t,sub,fn)=>h('button',{class:'item',onclick:fn},h('span',{},h('div',{style:'font-weight:600',text:t}),h('div',{class:'m',text:sub})));
+  const pf=h('input',{type:'file',accept:'image/*',style:'display:none'});pf.addEventListener('change',()=>{const fl=pf.files&&pf.files[0];if(fl){closeSheet();me?addPin('waypoint',[me.la,me.lo],fl):addPin('waypoint',null,fl)}});
+  const photoRow=h('label',{class:'item'},pf,h('span',{},h('div',{style:'font-weight:600',text:'Add a photo'}),h('div',{class:'m',text:me?'Pinned at your location':'Pinned at the cross'})));
+  openSheet([h('h2',{text:'Tools'}),
+    h('div',{class:'lbl',text:'Mark'}),
+    h('div',{class:'grid2'},[row('Mark my location','Pin where you stand, by GPS',()=>markHere('waypoint')),row('Waypoint','Pin at the cross',()=>addPin('waypoint'))]),
+    h('div',{class:'grid'},PLACE_KINDS.filter(k=>k!=='waypoint').map(k=>h('button',{class:'chip',text:KINDS[k].l,onclick:()=>addPin(k)}))),
+    h('div',{class:'lbl',text:'Draw and measure'}),
+    h('div',{class:'grid2'},[row('Build a route','Points along a trail, with time and climb',()=>startDraft('route')),row('Area shape','Hunting area or property, with size',()=>startDraft('area')),
+      row('Measure distance','Line distance and bearing',()=>startDraft('measure')),SHARED?null:row(rec?'Stop recording':'Record my track','Keep the screen on',toggleRec)]),
+    h('div',{class:'lbl',text:'Navigate and photos'}),
+    h('div',{class:'grid2'},[row('Compass','Heading, and the way to any pin',()=>openCompass(null)),photoRow]),
+    h('div',{class:'lbl',text:'Search and rescue'}),
+    h('div',{class:'grid2'},[row('Last known point','Where last seen',()=>addPin('lkp')),
+      row('Clue','Footprint, item, sighting',()=>addPin('clue')),
+      row('Search sector','Draw area, assign team',()=>startDraft('sector')),
+      row('Check in','Tell the team where you are',openCheckin)]),
+    h('div',{class:'note',text:SHARED?'Everyone with access sees what you add. For a missing person, call 911 first.':'For a missing person, call 911 first. This app is a planning aid.'}),
+    h('div',{class:'row'},h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+
+/* photos: kept on this device */
+let phP=null;
+function phDb(){if(!phP)phP=new Promise((res,rej)=>{try{const q=indexedDB.open('ridgeline-photos',1);q.onupgradeneeded=()=>q.result.createObjectStore('p');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}catch(e){rej(e)}});return phP}
+const phTx=(mode,fn)=>phDb().then(db=>new Promise((res,rej)=>{const t=db.transaction('p',mode),st=t.objectStore('p'),out=fn(st);t.oncomplete=()=>res(out&&out.v);t.onerror=()=>rej(t.error)}));
+function phList(fid){return phTx('readonly',st=>{const o={v:[]},rq=st.openCursor(IDBKeyRange.bound(fid+'|',fid+'|\uffff'));rq.onsuccess=()=>{const c=rq.result;if(c){o.v.push({k:c.key,b:c.value});c.continue()}};return o}).catch(()=>[])}
+const phDel=k=>phTx('readwrite',st=>{st.delete(k)}).catch(()=>{});
+const phDelAll=fid=>phTx('readwrite',st=>{st.delete(IDBKeyRange.bound(fid+'|',fid+'|\uffff'))}).catch(()=>{});
+async function shrink(file){
+  const url=URL.createObjectURL(file);
+  try{const im=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});const k=Math.min(1,1600/Math.max(im.naturalWidth,im.naturalHeight)),cv=document.createElement('canvas');
+    cv.width=Math.round(im.naturalWidth*k);cv.height=Math.round(im.naturalHeight*k);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+    return await new Promise(res=>cv.toBlob(b=>res(b||file),'image/jpeg',.82))}catch(e){return file}finally{URL.revokeObjectURL(url)}}
+async function addPhoto(fid,file){try{const b=await shrink(file);await phTx('readwrite',st=>{st.put(b,fid+'|'+Date.now().toString(36))});toast('Photo added.')}catch(e){toast('Could not save the photo on this device.')}}
+function photoBox(f){
+  const box=h('div',{class:'thumbs'}),urls=[];
+  const pf=h('input',{type:'file',accept:'image/*',style:'display:none'});pf.addEventListener('change',async()=>{const fl=pf.files&&pf.files[0];if(fl){await addPhoto(f.id,fl);fill()}pf.value=''});
+  const add=h('label',{class:'btn',style:'display:inline-flex;align-items:center;cursor:pointer'},pf,'Add photo');
+  async function fill(){urls.splice(0).forEach(u=>URL.revokeObjectURL(u));const list=await phList(f.id);
+    box.replaceChildren(...list.map(p=>{const u=URL.createObjectURL(p.b);urls.push(u);return h('button',{'aria-label':'Open photo',onclick:()=>openPhoto(f,p)},h('img',{src:u,alt:'Photo at '+f.name}))}))}
+  fill();
+  return h('div',{},h('div',{class:'lbl',text:'Photos'}),box,h('div',{class:'row'},add),h('div',{class:'note',text:'Photos stay on this device. They are not added to the shared map or to exported files.'}))}
+function openPhoto(f,p){const u=URL.createObjectURL(p.b);let armed=false;
+  const del=h('button',{class:'btn danger',text:'Delete photo',onclick:async()=>{if(!armed){armed=true;del.textContent='Tap again to delete';return}await phDel(p.k);URL.revokeObjectURL(u);openFeature(f.id)}});
+  openSheet([h('h2',{text:f.name}),h('img',{src:u,alt:'Photo at '+f.name,style:'width:100%;border-radius:10px;display:block'}),h('div',{class:'stat',text:new Date(parseInt(p.k.split('|')[1],36)).toLocaleString()}),
+    h('div',{class:'row'},h('button',{class:'btn',text:'Back',onclick:()=>{URL.revokeObjectURL(u);openFeature(f.id)}}),del)])}
+
+/* compass */
+let cmp={on:false,head:null,target:null,cv:null,src:''};
+function onOrient(e){let hd=null;if(typeof e.webkitCompassHeading==='number')hd=e.webkitCompassHeading;else if(e.alpha!=null&&(e.absolute||e.type==='deviceorientationabsolute'))hd=(360-e.alpha)%360;
+  if(hd==null)return;const so=(screen.orientation&&screen.orientation.angle)||window.orientation||0;cmp.head=(hd+so+360)%360;drawCompass()}
+function stopCompass(){cmp.on=false;window.removeEventListener('deviceorientationabsolute',onOrient);window.removeEventListener('deviceorientation',onOrient)}
+async function startCompass(){
+  if(cmp.on)return;cmp.on=true;
+  try{if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){const r=await DeviceOrientationEvent.requestPermission();if(r!=='granted'){cmp.src='denied';drawCompass();return}}}catch(e){}
+  if('ondeviceorientationabsolute' in window)window.addEventListener('deviceorientationabsolute',onOrient);else window.addEventListener('deviceorientation',onOrient)}
+function drawCompass(){
+  const cv=cmp.cv;if(!cv||!document.body.contains(cv)){stopCompass();return}
+  const dp=window.devicePixelRatio||1,S=cv.clientWidth||240;cv.width=S*dp;cv.height=S*dp;const c=cv.getContext('2d');c.setTransform(dp,0,0,dp,0,0);const R=S/2-8,o=S/2,hd=cmp.head||0;
+  c.clearRect(0,0,S,S);c.beginPath();c.arc(o,o,R,0,7);c.fillStyle=css('--bg');c.fill();c.lineWidth=2;c.strokeStyle=css('--line');c.stroke();
+  c.save();c.translate(o,o);c.rotate(-hd*rad);
+  for(let d=0;d<360;d+=10){const big=d%90===0,m=d%30===0;c.beginPath();c.moveTo(0,-R+2);c.lineTo(0,-R+(big?18:m?12:7));c.lineWidth=big?3:1.5;c.strokeStyle=d===0?'#D63A2F':css('--ink');c.stroke();
+    if(m){c.save();c.translate(0,-R+(big?32:26));c.rotate((hd-d)*rad);c.fillStyle=d===0?'#D63A2F':css('--muted');c.font=(big?'700 17px':'600 12px')+' Barlow,system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(big?['N','E','S','W'][d/90]:String(d),0,0);c.restore()}
+    c.rotate(10*rad)}
+  c.restore();
+  const t=cmp.target;let info='';
+  if(t){const from=me?[me.la,me.lo]:[view.lat,view.lon],brg=bearing(from,[t.la,t.lo]),dist=hav(from,[t.la,t.lo]);c.save();c.translate(o,o);c.rotate((brg-hd)*rad);
+    c.beginPath();c.moveTo(0,-R+40);c.lineTo(16,0);c.lineTo(5,0);c.lineTo(5,R-48);c.lineTo(-5,R-48);c.lineTo(-5,0);c.lineTo(-16,0);c.closePath();c.fillStyle=css('--accent');c.fill();c.restore();
+    info=t.name+': '+fmtDist(dist)+' at '+Math.round(brg)+'° ('+octOf(brg)+')'+(me?'':' from the cross')}
+  c.beginPath();c.moveTo(o,4);c.lineTo(o-8,20);c.lineTo(o+8,20);c.closePath();c.fillStyle=css('--ink');c.fill();
+  const hl=$('#cmpHead'),il=$('#cmpInfo');if(hl)hl.textContent=cmp.head==null?(cmp.src==='denied'?'Compass access was not allowed.':'No compass reading yet. Hold the phone flat. Computers usually have no compass.'):'Heading '+Math.round(hd)+'° '+octOf(hd);if(il)il.textContent=info}
+function openCompass(target){
+  cmp.target=target||null;cmp.cv=h('canvas',{style:'display:block;margin:6px auto;width:240px;height:240px;max-width:100%'});
+  const near=[...features.values()].filter(f=>f.type==='pin'&&shown(f)).map(f=>({f,d:hav(me?[me.la,me.lo]:[view.lat,view.lon],[f.la,f.lo])})).sort((a,b)=>a.d-b.d).slice(0,8);
+  const tr=h('div',{class:'row'},...near.map(({f})=>h('button',{class:'chip','aria-pressed':String(!!cmp.target&&cmp.target.id===f.id),text:f.kind==='checkin'?(f.who||'Check-in'):f.name,onclick:()=>openCompass(f)})));
+  openSheet([h('h2',{text:'Compass'}),h('div',{id:'cmpHead',class:'stat',style:'text-align:center;font-weight:600'}),cmp.cv,h('div',{id:'cmpInfo',class:'stat',style:'text-align:center'}),
+    h('div',{class:'lbl',text:'Point the way to'}),near.length?tr:h('div',{class:'note',text:'Add a pin to get an arrow pointing to it.'}),
+    h('div',{class:'note',text:(SHARED?'This shared page cannot read the compass or GPS. ':'')+'Bearings are from true north. Phone compasses drift near metal and vehicles, so check against a real compass on a search.'}),
+    h('div',{class:'row'},h('button',{class:'btn',text:'Close',onclick:()=>{stopCompass();closeSheet()}}))]);
+  if(!SHARED){startCompass();if(cmp.target&&!me)startWatch()}drawCompass()}
+setInterval(()=>{if(cmp.on)drawCompass()},2000);
+
+/* saved content */
+let savedTab='all';
+function bbox(f){const P=f.type==='pin'?[[f.la,f.lo]]:f.pts;let a=90,b=-90,c=180,d=-180;for(const q of P){a=Math.min(a,q[0]);b=Math.max(b,q[0]);c=Math.min(c,q[1]);d=Math.max(d,q[1])}return [a,b,c,d]}
+function showOnMap(f){const [a,b,c,d]=bbox(f);view.lat=(a+b)/2;view.lon=(c+d)/2;const span=Math.max((b-a)*111320/H,(d-c)*111320*Math.cos(view.lat*rad)/W);view.mpp=f.type==='pin'?Math.min(view.mpp,10):Math.max(1,span*1.4);redraw()}
+function openSaved(){
+  const CAT={routes:{l:'Routes',t:f=>f.type==='track'&&f.kind==='route'},tracks:{l:'Tracks',t:f=>f.type==='track'&&f.kind!=='route'},areas:{l:'Hunting areas',t:f=>f.type==='area'},waypoints:{l:'Waypoints',t:f=>f.type==='pin'&&PLACE_KINDS.includes(f.kind)},sar:{l:'Search',t:f=>f.type==='sector'||(f.type==='pin'&&!PLACE_KINDS.includes(f.kind))}};
+  const all=[...features.values()],q=h('input',{class:'in',type:'search',placeholder:'Search by name or note','aria-label':'Search saved items'}),list=h('div',{}),tabs=h('div',{class:'row'});
+  const color=f=>f.type==='area'?AREA_C:f.type==='sector'?(STATUS[f.status]||STATUS.todo).c:f.type==='track'?(f.kind==='route'?css('--accent'):(tmOf(f.team)?tmOf(f.team).c:css('--crew'))):(KINDS[f.kind]||KINDS.waypoint).c;
+  const meta=f=>(f.type==='area'||f.type==='sector'?fmtArea(areaM2(f.pts)):f.type==='track'?fmtDist(pathLen(f.pts)):(KINDS[f.kind]||KINDS.waypoint).l)+(f.ts?' · '+ago(f.ts):'')+(f.who?' · '+f.who:'');
+  const dt=()=>tabs.replaceChildren(...[['all','All',()=>true],...Object.entries(CAT).map(([k,v])=>[k,v.l,v.t])].map(([k,l,t])=>h('button',{class:'chip','aria-pressed':String(savedTab===k),text:l+' '+all.filter(t).length,onclick:()=>{savedTab=k;dt();fill()}})));
+  const fill=()=>{const s=q.value.trim().toLowerCase(),t=savedTab==='all'?()=>true:CAT[savedTab].t;
+    const items=all.filter(f=>t(f)&&(!s||(f.name+' '+f.note+' '+(f.who||'')).toLowerCase().includes(s))).filter(f=>f.kind!=='checkin'||shown(f)).sort((a,b)=>(b.ts||0)-(a.ts||0));
+    list.replaceChildren(...(items.length?items.map(f=>h('button',{class:'item',onclick:()=>{closeSheet();showOnMap(f);setTimeout(()=>openFeature(f.id),250)}},h('span',{class:'sw',style:'background:'+color(f)}),h('span',{style:'min-width:0'},h('div',{style:'font-weight:600;overflow-wrap:anywhere',text:f.kind==='checkin'?(f.who||'Someone')+' check-in':f.name}),h('div',{class:'m',text:meta(f)})))):[h('div',{class:'card',text:all.length?'Nothing matches.':'Nothing saved yet. Use Tools to add waypoints, routes and areas.'})]))};
+  q.addEventListener('input',fill);dt();fill();
+  openSheet([h('h2',{text:'Saved'}),tabs,q,list,h('div',{class:'row'},h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+
+async function addPin(kind,at,photo){
+  if(PLACE_KINDS.includes(kind)&&!can('places')&&[...features.values()].filter(f=>f.type==='pin'&&PLACE_KINDS.includes(f.kind)).length>=MEMBERSHIP.freePlaceLimit){closeSheet();upsell('places');return}
+  const n=[...features.values()].filter(f=>f.kind===kind).length+1;
+  const f={...base(),type:'pin',kind,name:kind==='lkp'?'Last known point':KINDS[kind].l+' '+n,la:at?at[0]:view.lat,lo:at?at[1]:view.lon};
+  closeSheet();await saveFeature(f);if(photo)await addPhoto(f.id,photo);openPin(f)}
+function openCheckin(){
+  const here=me?{la:me.la,lo:me.lo}:{la:view.lat,lo:view.lon};
+  const msg=h('textarea',{class:'in',rows:'3',maxlength:'500',placeholder:'Notes: what you see, what you did, what you need','aria-label':'Notes'});
+  const QUICK=['Sector done','Found a clue','Need help','Heading back','All clear','Taking a break'];
+  const quick=h('div',{class:'row'},QUICK.map(q=>h('button',{class:'chip',text:q,onclick:()=>{msg.value=msg.value.trim()?msg.value.trim()+'. '+q:q;msg.focus()}})));
+  openSheet([h('h2',{text:'Check in'}),h('div',{class:'stat',text:'Team: '+(tmOf(myTeam())?tmOf(myTeam()).g+' '+tmOf(myTeam()).l:'none. Tap the round team button at the top to choose.')}),h('div',{class:'stat',text:me?'Using your GPS position.':'Using the cross on the map. Tap Me first to use your GPS position.'}),h('div',{class:'lbl',text:'Notes'}),msg,quick,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Check in',onclick:async()=>{closeSheet();await saveFeature({...base(),type:'pin',kind:'checkin',name:callsign(),note:msg.value.trim(),la:here.la,lo:here.lo});toast('Checked in.')}}),h('button',{class:'btn',text:'Cancel',onclick:closeSheet})),
+    h('div',{class:'note',text:'A check-in shows your name, position and time to everyone using the shared map.'})])}
+function drawTeamBtn(){const b=$('#teamBtn'),t=tmOf(myTeam());b.textContent=t?t.g:'⚑';b.style.background=t?t.c:'';b.style.color=t?'#fff':'';b.style.borderColor=t?t.c:'';b.style.fontSize=t&&t.g.length>1?'13px':''}
+function openTeamEdit(){
+  if(!can('customTeam')){upsell('customTeam');return}
+  const cur=tmOf(myTeam())||{l:'My team',c:'#D63A2F',g:'★'};let name=cur.l,col=cur.c,gl=cur.g;
+  const COLS=['#D63A2F','#D9780F','#B8860B','#2F8F4E','#1E8A94','#2563B8','#8250B0','#C2185B','#5F6B64','#111111'];
+  const GL=['★','▲','■','●','◆','▼','+','⚑','☀','☾','⚡','K9','🐕','🚁','🐴','🚙','🧭','🔦'];
+  const nm=h('input',{class:'in',maxlength:'20','aria-label':'Team name'});nm.value=name;
+  const own=h('input',{class:'in',maxlength:'4',placeholder:'Type a letter, number or emoji','aria-label':'Your own symbol'});
+  const prev=h('div',{style:'display:flex;align-items:center;gap:10px;margin:8px 0'}),cr=h('div',{class:'row'}),gr=h('div',{class:'row'});
+  const draw=()=>{const g=Array.from(gl).slice(0,2).join('')||'?';prev.replaceChildren(h('span',{style:'width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:'+(g.length>1?16:20)+'px;background:'+col+';border:3px solid #fff;box-shadow:0 0 0 1px #8888',text:g}),h('span',{class:'stat',text:(nm.value.trim()||'My team')}));
+    cr.replaceChildren(...COLS.map(c=>h('button',{class:'chip','aria-label':'Color '+c,'aria-pressed':String(col===c),style:'width:44px;padding:0;justify-content:center;background:'+c+';border:3px solid '+(col===c?'var(--ink)':'transparent'),onclick:()=>{col=c;draw()}})));
+    gr.replaceChildren(...GL.map(g=>h('button',{class:'chip','aria-pressed':String(gl===g),style:'min-width:44px;padding:0 8px;justify-content:center',text:g,onclick:()=>{gl=g;own.value='';draw()}})))};
+  nm.addEventListener('input',draw);own.addEventListener('input',()=>{const g=Array.from(own.value.trim()).slice(0,2).join('');if(g){gl=g;draw()}});draw();
+  openSheet([h('h2',{text:'My team icon'}),prev,h('div',{class:'lbl',text:'Name'}),nm,h('div',{class:'lbl',text:'Color'}),cr,h('div',{class:'lbl',text:'Symbol'}),gr,own,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Use this icon',onclick:()=>{const v=mkTeam(nm.value.trim()||'My team',col,gl||'★');const a=savedTeams().filter(x=>x!==v);a.push(v);LS.set('myteams',a.slice(-6));LS.set('team',v);drawTeamBtn();redraw();closeSheet();toast('Team icon set.')}}),h('button',{class:'btn',text:'Back',onclick:openTeam})),
+    h('div',{class:'note',text:'Everyone on the map sees your icon, name and color.'})])}
+function openTeam(){
+  const cur=myTeam(),pick=id=>{LS.set('team',id);drawTeamBtn();redraw();closeSheet();toast(id?'You are on team '+tmOf(id).l+'.':'Team cleared.')};
+  const chip=t=>h('button',{class:'chip','aria-pressed':String(cur===t.id),onclick:()=>pick(t.id)},h('span',{style:'color:'+t.c+';font-weight:700',text:t.g}),' '+t.l);
+  openSheet([h('h2',{text:'My team'}),h('div',{class:'stat',text:'Pick a team, or make your own icon. Your check-ins, tracks and pins show it so everyone can tell the search parties apart.'}),
+    h('div',{class:'grid'},[...allTeams().map(chip),chip({id:'',l:'No team',c:'#5F6B64',g:'–'})]),h('div',{class:'row'},h('button',{class:'btn',text:'Make my own team icon',onclick:openTeamEdit})),
+    h('div',{class:'note',text:'Sectors are assigned to a team when you tap the sector. Agree on names with your search leader.'}),
+    h('div',{class:'row'},h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+function joinFromHash(){const m=/^#team-(.+)$/.exec(location.hash||'');if(!m)return;let t;try{t=decodeURIComponent(m[1])}catch(e){return}
+  if(tmOf(t)){LS.set('team',t);if(t[0]==='~'){const a=savedTeams().filter(x=>x!==t);a.push(t);LS.set('myteams',a.slice(-6))}setTimeout(()=>toast('You joined team '+tmOf(t).l+'. Change it with the round button at the top.'),700)}
+  try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}if(typeof drawTeamBtn==='function'){drawTeamBtn();redraw()}}
+joinFromHash();window.addEventListener('hashchange',joinFromHash);
+$('#teamBtn').addEventListener('click',openTeam);drawTeamBtn();
+function startDraft(mode){if(mode==='route'&&!can('route')){upsell('route');return}if(mode==='area'&&!can('area')){upsell('area');return}closeSheet();draft={mode,pts:[]};renderBar();redraw()}
+async function finishDraft(){
+  if(draft.mode==='measure'){const d=pathLen(draft.pts);draft=null;renderBar();redraw();if(d)toast('Measured '+fmtDist(d)+'.');return}
+  const md=draft.mode,need=md==='route'?2:3;if(draft.pts.length<need){toast('Add at least '+need+' points.');return}
+  const c=centroid(draft.pts),n=[...features.values()].filter(f=>md==='route'?f.kind==='route':f.type===md).length+1;
+  const f=md==='route'?{...base(),type:'track',kind:'route',name:'Route '+n,pts:draft.pts,la:c[0],lo:c[1]}:md==='area'?{...base(),type:'area',kind:'area',team:'',name:'Hunting area '+n,pts:draft.pts,la:c[0],lo:c[1]}:{...base(),type:'sector',kind:'sector',team:'',name:'Sector '+n,pts:draft.pts,la:c[0],lo:c[1]};
+  draft=null;renderBar();await saveFeature(f);openFeature(f.id)}
+const recInfo=()=>'Recording · '+fmtDist(pathLen(rec.pts))+' · '+rec.pts.length+' points';
+function renderBar(){
+  const b=$('#bar');$('#actions').hidden=!!(draft||rec);
+  if(!draft&&!rec){b.hidden=true;return}
+  b.hidden=false;
+  if(draft){const n=draft.pts.length,md=draft.mode,line_=md==='route'||md==='measure',need=line_?2:3,L={route:'Route',sector:'Sector',area:'Hunting area',measure:'Measure'}[md];
+    const info=n<need?L+': '+n+' point'+(n===1?'':'s')+'. Move the cross, then tap Add point.':line_?L+' · '+fmtDist(pathLen(draft.pts))+(md==='measure'&&n>1?' · last leg '+Math.round(bearing(draft.pts[n-2],draft.pts[n-1]))+'°':''):L+' · '+fmtArea(areaM2(draft.pts))+' · edge '+fmtDist(pathLen(draft.pts.concat([draft.pts[0]])));
+    b.replaceChildren(h('div',{style:'flex:1 0 100%;font-weight:600',text:info}),
+      h('button',{class:'btn primary',text:'Add point',onclick:()=>{draft.pts.push([view.lat,view.lon]);renderBar();redraw()}}),
+      h('button',{class:'btn',text:'Undo',onclick:()=>{draft.pts.pop();renderBar();redraw()}}),
+      md==='measure'?h('button',{class:'btn',text:'Save as route',onclick:()=>{if(!can('route')){upsell('route');return}if(draft.pts.length<2){toast('Add at least 2 points.');return}draft.mode='route';finishDraft()}}):h('button',{class:'btn',text:'Done',onclick:finishDraft}),
+      h('button',{class:'btn',text:md==='measure'?'Close':'Cancel',onclick:()=>{draft=null;renderBar();redraw()}}))}
+  else b.replaceChildren(h('div',{id:'barinfo',style:'flex:1 0 100%;font-weight:600',text:recInfo()}),h('button',{class:'btn primary',text:'Stop and save',onclick:()=>stopRec(true)}),h('button',{class:'btn',text:'Discard',onclick:()=>stopRec(false)}))}
+async function toggleRec(){
+  closeSheet();if(rec){stopRec(true);return}
+  if(!can('track')){upsell('track');return}
+  if(!startWatch()){toast('Location is not available in this view. Open the saved file in your phone browser.');return}
+  rec={pts:me?[[me.la,me.lo]]:[]};try{wake=await navigator.wakeLock.request('screen')}catch(e){wake=null}
+  renderBar();toast('Recording. Keep this page open and the screen on.')}
+async function stopRec(save){
+  if(wake){try{wake.release()}catch(e){}wake=null}
+  const r=rec;rec=null;renderBar();redraw();
+  if(save&&r&&r.pts.length>1){const c=centroid(r.pts),f={...base(),type:'track',kind:'track',name:'Track '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}),pts:r.pts,la:c[0],lo:c[1]};await saveFeature(f);openTrack(f)}
+  else if(save)toast('Not enough movement to save.')}
+document.addEventListener('visibilitychange',async()=>{if(rec&&!document.hidden&&!wake){try{wake=await navigator.wakeLock.request('screen')}catch(e){}}});
+
+function delBtn(f){let armed=false;const b=h('button',{class:'btn danger',text:'Delete',onclick:async()=>{if(!armed){armed=true;b.textContent='Tap again to delete';return}closeSheet();await removeFeature(f.id)}});return b}
+const metaLine=f=>(f.who?f.who+' · ':'')+(f.ts?new Date(f.ts).toLocaleString([], frOn()?{weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}:{weekday:'short',hour:'numeric',minute:'2-digit'}):'');
+function openFeature(id){const f=features.get(id);if(!f)return;if(f.type==='area')openArea(f);else if(f.type==='sector')openSector(f);else if(f.type==='track')openTrack(f);else openPin(f)}
+function openPin(f){
+  let kind=f.kind,radius=f.radius||0;const winds=new Set(f.winds),editable=PLACE_KINDS.includes(f.kind);
+  const nm=h('input',{class:'in',maxlength:'80','aria-label':'Name'});nm.value=f.name;
+  const nt=h('textarea',{class:'in',rows:'3',maxlength:'500',placeholder:'Notes','aria-label':'Notes'});nt.value=f.note;
+  const where=me?fmtDist(hav([me.la,me.lo],[f.la,f.lo]))+' '+octOf(bearing([me.la,me.lo],[f.la,f.lo]))+' of you · '+fmtLL(f.la,f.lo):fmtLL(f.la,f.lo);
+  const kindRow=h('div',{class:'row'}),windBox=h('div',{}),ringBox=h('div',{});
+  const elv=h('div',{class:'stat'});if(!SHARED&&can('terrain'))elevFetch([[f.la,f.lo]]).then(e=>{if(e&&e[0]!=null)elv.textContent='Elevation '+fmtElev(e[0])});
+  const isSign=f.kind==='lkp'||f.kind==='clue',pad=n=>String(n).padStart(2,'0');
+  const toLoc=ms=>{const d=new Date(ms);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())};
+  const seenIn=h('input',{type:'datetime-local',class:'in','aria-label':'When this was seen'});seenIn.value=toLoc(f.seen||f.ts||Date.now());
+  function drawKinds(){if(!editable){kindRow.replaceChildren();return}kindRow.replaceChildren(...PLACE_KINDS.map(k=>h('button',{class:'chip','aria-pressed':String(kind===k),text:KINDS[k].l,onclick:()=>{kind=k;drawKinds();drawWinds()}})))}
+  function drawWinds(){
+    if(kind!=='stand'){windBox.replaceChildren();return}
+    const ok=wind&&winds.has(octOf(wind.from));
+    const status=!winds.size?h('div',{class:'stat',text:'Tap the wind directions this stand works in.'}):!wind?h('div',{class:'stat',text:'Set the wind at the top of the map to see if it is right today.'}):h('div',{class:'stat '+(ok?'ok':'no'),text:'Wind from '+octOf(wind.from)+': '+(ok?'good for this stand':'wrong wind for this stand')});
+    windBox.replaceChildren(h('div',{class:'lbl',text:'Hunt it when the wind is from'}),h('div',{class:'row'},OCT.map(o=>h('button',{class:'chip','aria-pressed':String(winds.has(o)),text:o,onclick:()=>{winds.has(o)?winds.delete(o):winds.add(o);drawWinds()}}))),status)}
+  if(f.kind==='lkp'){const us=units==='imp'?402.336:250,sl=h('input',{type:'range',min:'0',max:'24',value:String(Math.round(radius/us)),'aria-label':'Search ring'}),lab=h('div',{class:'stat'});
+    const upd=()=>{radius=+sl.value*us;lab.textContent=radius?'Search ring: '+fmtDist(radius):'No search ring'};sl.addEventListener('input',upd);upd();
+    ringBox.append(h('div',{class:'lbl',text:'Search ring around this point'}),sl,lab)}
+  drawKinds();drawWinds();
+  openSheet([h('h2',{text:(KINDS[f.kind]||KINDS.waypoint).l}),nm,h('div',{class:'stat',text:where}),elv,f.ts?h('div',{class:'stat',text:metaLine(f)}):null,kindRow,windBox,ringBox,photoBox(f),isSign?h('div',{},h('div',{class:'lbl',text:'When was this seen'}),seenIn,h('div',{class:'note',text:'Two or more signs with times draw a projected route on the map.'})):null,h('div',{class:'lbl',text:'Notes'}),nt,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Save',onclick:async()=>{await saveFeature({...f,name:nm.value.trim()||f.name,note:nt.value.trim(),kind:editable?kind:f.kind,winds:(editable&&kind==='stand')?[...winds]:[],radius,seen:isSign&&seenIn.value?new Date(seenIn.value).getTime()||0:f.seen||0});closeSheet()}}),h('button',{class:'btn',text:'Navigate',onclick:()=>openCompass(f)}),h('button',{class:'btn',text:'QR code',onclick:()=>openPinQR(f)}),delBtn(f),h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+function openArea(f){
+  const nm=h('input',{class:'in',maxlength:'80','aria-label':'Area name'});nm.value=f.name;
+  const nt=h('textarea',{class:'in',rows:'3',maxlength:'500',placeholder:'Notes: owner, permission, access, game sign','aria-label':'Notes'});nt.value=f.note;
+  openSheet([h('h2',{text:'Hunting area'}),nm,h('div',{class:'stat',text:fmtArea(areaM2(f.pts))+' · boundary '+fmtDist(pathLen(f.pts.concat([f.pts[0]])))+(f.ts?' · '+metaLine(f):'')}),h('div',{class:'lbl',text:'Notes'}),nt,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Save',onclick:async()=>{await saveFeature({...f,name:nm.value.trim()||f.name,note:nt.value.trim()});closeSheet()}}),delBtn(f),h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+function openSector(f){
+  let status=f.status;
+  const nm=h('input',{class:'in',maxlength:'80','aria-label':'Sector name'});nm.value=f.name;
+  let team=f.team||'';const teamRow=h('div',{class:'row'}),dt=()=>teamRow.replaceChildren(...[{id:'',l:'Unassigned',c:'#5F6B64',g:'–'},...allTeams(),...(team&&tmOf(team)&&!allTeams().some(t=>t.id===team)?[tmOf(team)]:[])].map(t=>h('button',{class:'chip','aria-pressed':String(team===t.id),onclick:()=>{team=t.id;dt()}},h('span',{style:'color:'+t.c+';font-weight:700',text:t.g}),' '+t.l)));dt();
+  const nt=h('textarea',{class:'in',rows:'3',maxlength:'500',placeholder:'Notes: terrain, what was covered','aria-label':'Notes'});nt.value=f.note;
+  const sr=h('div',{class:'row'}),ds=()=>sr.replaceChildren(...Object.entries(STATUS).map(([k,v])=>h('button',{class:'chip','aria-pressed':String(status===k),text:v.l,onclick:()=>{status=k;ds()}})));ds();
+  openSheet([h('h2',{text:'Search sector'}),nm,h('div',{class:'stat',text:fmtArea(areaM2(f.pts))+(f.ts?' · '+metaLine(f):'')}),h('div',{class:'lbl',text:'Assigned to'}),teamRow,tmOf(team)||!team?null:h('div',{class:'note',text:'Previously assigned to: '+team}),h('div',{class:'lbl',text:'Status'}),sr,h('div',{class:'lbl',text:'Notes'}),nt,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Save',onclick:async()=>{await saveFeature({...f,name:nm.value.trim()||f.name,team,status,note:nt.value.trim()});closeSheet()}}),delBtn(f),h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+const fmtDur=sec=>{const m=Math.round(sec/60);return m<60?m+' min':Math.floor(m/60)+' h '+(m%60)+' min'};
+function openTrack(f){
+  const planned=f.kind==='route',len=pathLen(f.pts);let elev=null;
+  const nm=h('input',{class:'in',maxlength:'80','aria-label':'Name'});nm.value=f.name;
+  const nt=h('textarea',{class:'in',rows:'3',maxlength:'500',placeholder:'Notes','aria-label':'Notes'});nt.value=f.note;
+  const st=h('div',{class:'stat'}),eb=h('div',{});
+  const upd=()=>{st.textContent=fmtDist(len)+' · about '+fmtDur(elev?len/1.389+elev.gain/600*3600:len/1.34)+' on foot'+(elev?' · climbs '+(units==='imp'?Math.round(elev.gain*3.28084)+' ft':Math.round(elev.gain)+' m')+', drops '+(units==='imp'?Math.round(elev.loss*3.28084)+' ft':Math.round(elev.loss)+' m'):'')};upd();
+  async function getElev(){
+    btn.disabled=true;btn.textContent='Loading…';
+    const n=Math.min(100,Math.max(12,Math.round(len/60))),sa=sampleAlong(f.pts,n),e0=await elevFetch(sa.pts);
+    if(!e0||e0.some(v=>v==null)){btn.disabled=false;btn.textContent='Show elevation and steepness';toast('Could not load elevation. It needs an internet connection.');return}
+    const e=smooth(e0);let gain=0,loss=0,maxg=0,steepM=0;
+    for(let i=1;i<e.length;i++){const d=e[i]-e[i-1],dx=(sa.ds[i]-sa.ds[i-1])||1,dg=Math.atan(Math.abs(d)/dx)/rad;if(d>0)gain+=d;else loss-=d;if(dg>maxg)maxg=dg;if(dg>=30)steepM+=dx}
+    elev={gain,loss};upd();btn.remove();
+    const cvp=h('canvas',{style:'width:100%;height:130px;border-radius:10px;border:1px solid var(--line);margin-top:8px'});
+    eb.append(cvp,h('div',{class:'stat',text:'Highest '+fmtElev(Math.max(...e))+' · lowest '+fmtElev(Math.min(...e))+' · steepest stretch about '+Math.round(maxg)+'°'+(steepM>0?' · '+fmtDist(steepM)+' over 30°':'')}),
+      h('div',{class:'note',text:'Green is gentle. Yellow, orange, red and purple mark 10°, 20°, 30° and 40° or more. Elevation data is about 90 m across, so short cliffs and steep spots do not show.'}));
+    drawProfile(cvp,sa.ds,e)}
+  const btn=h('button',{class:'btn',text:'Show elevation and steepness',onclick:gate('terrain',getElev)});
+  if(!SHARED)eb.append(h('div',{class:'row'},btn));
+  openSheet([h('h2',{text:planned?'Route':'Track'}),nm,st,f.ts?h('div',{class:'stat',text:metaLine(f)}):null,eb,h('div',{class:'lbl',text:'Notes'}),nt,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Save',onclick:async()=>{await saveFeature({...f,name:nm.value.trim()||f.name,note:nt.value.trim()});closeSheet()}}),delBtn(f),h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+
+/* GPS */
+function startWatch(){
+  if(watchId!=null)return true;if(!navigator.geolocation)return false;
+  watchId=navigator.geolocation.watchPosition(onPos,err=>{watchId=null;followNext=false;toast(err&&err.code===1?'Location is blocked. Allow it for this page, then tap Me again.':'No GPS signal yet. Try again outside.')},{enableHighAccuracy:true,maximumAge:2000,timeout:25000});return true}
+function onPos(p){
+  me={la:p.coords.latitude,lo:p.coords.longitude,acc:p.coords.accuracy||20,t:Date.now()};
+  if(markWait){const mw=markWait;markWait=null;addPin(mw.kind,[me.la,me.lo],mw.photo);toast('Marked your location.')}
+  if(rec){const l=rec.pts[rec.pts.length-1];if(!l||hav(l,[me.la,me.lo])>8){rec.pts.push([me.la,me.lo]);if(rec.pts.length>1500)rec.pts=rec.pts.filter((_,i)=>i%2===0);const bi=$('#barinfo');if(bi)bi.textContent=recInfo()}}
+  if(followNext){followNext=false;view.lat=me.la;view.lon=me.lo;if(view.mpp>20)view.mpp=5;if(!wx.ok||hav([wx.la,wx.lo],[me.la,me.lo])>10000)wxFetch()}
+  redraw()}
+$('#meBtn').addEventListener('click',()=>{
+  if(me){view.lat=me.la;view.lon=me.lo;if(view.mpp>20)view.mpp=5;redraw();return}
+  if(window.claude&&window.claude.use){toast('GPS does not work in the shared view. Use Menu, then Go to coordinates, or open the saved file in your phone browser.');return}
+  if(!startWatch()){toast('Location is not available in this view. Open the saved file in your phone browser.');return}
+  followNext=true});
+
+/* wind and forecast */
+const wx={ok:false,busy:false,err:false,la:0,lo:0,at:0,now:0,t:[],s:[],d:[],g:[],c:[],p:[],sun:null};
+const tLbl=t=>new Date(t+'Z').toLocaleString([], {weekday:'short',hour:'numeric',timeZone:'UTC'});
+const hLbl=t=>new Date(t+'Z').toLocaleTimeString([], {hour:'numeric',timeZone:'UTC'});
+const tC2=c=>units==='imp'?Math.round(c*9/5+32)+'°F':Math.round(c)+'°C';
+function drawWindBtn(){$('#windBtn').textContent=wind?octOf(wind.from)+' '+mph2(wind.mph)+(wind.label&&wind.label!=='Now'&&wind.label!=='Manual'?' · '+wind.label:''):'Set wind';$('#windBtn').setAttribute('aria-label',wind?'Wind from '+octOf(wind.from)+' '+mph2(wind.mph)+'. Open forecast.':'Set wind')}
+function setWind(w){wind=w;LS.set('wind',wind);drawWindBtn();redraw()}
+function setHour(i,auto){setWind({from:Math.round(wx.d[i])%360,mph:Math.round(wx.s[i]),label:i===wx.now?'Now':tLbl(wx.t[i]),auto:!!auto})}
+async function wxFetch(){
+  if(window.claude&&window.claude.use){wx.err=true;return}
+  if(wx.busy)return;wx.busy=true;wx.err=false;
+  const la=me?me.la:view.lat,lo=me?me.lo:view.lon;
+  try{
+    const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),12000);
+    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude='+la.toFixed(3)+'&longitude='+lo.toFixed(3)+'&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,precipitation_probability&daily=sunrise,sunset&wind_speed_unit=mph&timezone=auto&forecast_days=3',{signal:ctl.signal});clearTimeout(to);
+    if(!r.ok)throw new Error('http');
+    const j=await r.json(),hr=j.hourly;if(!hr||!hr.time||!hr.wind_speed_10m)throw new Error('shape');
+    wx.t=hr.time;wx.s=hr.wind_speed_10m;wx.d=hr.wind_direction_10m;wx.g=hr.wind_gusts_10m;wx.c=hr.temperature_2m;wx.p=hr.precipitation_probability||[];wx.sun=j.daily||null;wx.la=la;wx.lo=lo;
+    const loc=Date.now()+(j.utc_offset_seconds||0)*1000;let k=0;wx.t.forEach((t,i)=>{if(Date.parse(t+'Z')<=loc)k=i});wx.now=k;wx.ok=true;wx.at=Date.now();
+    if(!wind||wind.auto||wind.label==='Now')setHour(k,true);
+  }catch(e){wx.err=true}
+  wx.busy=false;const sh=$('#sheet');if(sh.classList.contains('on')&&sh.dataset.wx)openWeather()}
+function daylight(i){if(!wx.sun||!wx.sun.time)return true;const t=wx.t[i],k=wx.sun.time.indexOf(t.slice(0,10));if(k<0)return true;const ms=Date.parse(t+'Z');return ms+3600000>Date.parse(wx.sun.sunrise[k]+'Z')-1800000&&ms<Date.parse(wx.sun.sunset[k]+'Z')+1800000}
+function openWeather(){
+  if(!wx.busy&&(!wx.ok||Date.now()-wx.at>30*60000))wxFetch();
+  const n=[h('h2',{text:'Weather'})];
+  n.push(h('div',{class:'stat',text:wx.ok?'Forecast updated '+new Date(wx.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+'. Tap an hour to see your stands for it.':wx.busy?'Loading the forecast…':'No forecast. It needs an internet connection and does not load inside the shared claude.ai page. Set the wind by hand below.'}));
+  if(wx.ok&&wx.sun&&wx.sun.time){const k=wx.sun.time.indexOf(wx.t[wx.now].slice(0,10));if(k>=0){const f=t=>new Date(t+'Z').toLocaleTimeString([], {hour:'numeric',minute:'2-digit',timeZone:'UTC'});n.push(h('div',{class:'stat',text:'Sunrise '+f(wx.sun.sunrise[k])+' · Sunset '+f(wx.sun.sunset[k])}))}}
+  if(wx.ok){
+    const stands=[...features.values()].filter(f=>f.kind==='stand'&&f.winds.length);
+    if(stands.length){n.push(h('div',{class:'lbl',text:'Best daylight hours for your stands'}));
+      stands.forEach(f=>{const hrs=[];for(let i=wx.now;i<Math.min(wx.t.length,wx.now+48);i++){if(wx.s[i]>=1&&f.winds.includes(octOf(wx.d[i]))&&daylight(i))hrs.push(i)}
+        const rg=[];hrs.forEach(i=>{const l=rg[rg.length-1];if(l&&l[1]===i-1)l[1]=i;else rg.push([i,i])});
+        n.push(h('div',{class:'card'},h('div',{style:'font-weight:600',text:f.name||'Stand'}),h('div',{class:'stat',text:rg.length?rg.map(([a,b])=>tLbl(wx.t[a])+' to '+hLbl(wx.t[Math.min(b+1,wx.t.length-1)])).join(', '):'No good wind in daylight for the next 2 days.'})))})}
+    n.push(h('div',{class:'lbl',text:'Next 2 days'}));
+    for(let i=wx.now;i<Math.min(wx.t.length,wx.now+48);i+=3){const idx=i;
+      n.push(h('button',{class:'item',onclick:()=>{setHour(idx,false);closeSheet()}},h('span',{style:'font-weight:600;min-width:84px',text:idx===wx.now?'Now':tLbl(wx.t[idx])}),h('span',{class:'m',text:octOf(wx.d[idx])+' '+mph2(wx.s[idx])+' · gusts '+mph2(wx.g[idx])+' · '+tC2(wx.c[idx])+(wx.p[idx]!=null?' · rain '+Math.round(wx.p[idx])+'%':'')})))}}
+  let mFrom=wind?Math.round(wind.from/45)%8*45:270,mMph=wind?wind.mph:5;
+  const chips=h('div',{class:'row'}),ml=h('div',{class:'stat'}),sl=h('input',{type:'range',min:'0',max:'30',value:String(mMph),'aria-label':'Wind speed'});
+  const dc=()=>{chips.replaceChildren(...OCT.map((o,i)=>h('button',{class:'chip','aria-pressed':String(mFrom===i*45),text:o,onclick:()=>{mFrom=i*45;dc()}})));ml.textContent='Wind from '+octOf(mFrom)+' at '+mph2(mMph)};dc();
+  sl.addEventListener('input',()=>{mMph=+sl.value;ml.textContent='Wind from '+octOf(mFrom)+' at '+mph2(mMph)});
+  n.push(h('details',wx.ok?{}:{open:''},h('summary',{text:'Set the wind by hand'}),chips,sl,ml,h('div',{class:'row'},h('button',{class:'btn primary',text:'Use this wind',onclick:()=>{setWind({from:mFrom,mph:mMph,label:'Manual',auto:false});closeSheet()}}))));
+  n.push(h('div',{class:'row'},wx.ok?h('button',{class:'btn',text:'Refresh',onclick:()=>wxFetch()}):null,h('button',{class:'btn',text:'Close',onclick:closeSheet})),h('div',{class:'note',text:'Forecast by Open-Meteo.com for '+(me?'your location':'the map centre')+'.'}));
+  openSheet(n);$('#sheet').dataset.wx='1'}
+$('#windBtn').addEventListener('click',openWeather);
+
+/* menu */
+async function saveFile(name,data){
+  try{const d=(window.claude&&window.claude.use)?await window.claude.use('downloads'):null;
+    if(d){await d.save({filename:name,data})}else{const a=h('a',{href:URL.createObjectURL(new Blob([data],{type:'application/octet-stream'})),download:name});document.body.append(a);a.click();a.remove();toast('Saved '+name)}}
+  catch(e){if(!e||e.code!=='declined')toast('Could not save the file.')}}
+const esc=t=>String(t).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
+function toGpx(){
+  const iso=t=>t?'<time>'+new Date(t).toISOString()+'</time>':'';
+  let o='<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Ridgeline" xmlns="http://www.topografix.com/GPX/1/1">\n'+(frOn()&&incident().name?'<metadata><name>'+esc(incidentLabel())+'</name></metadata>\n':'');
+  for(const f of features.values()){
+    if(f.type==='pin')o+='<wpt lat="'+f.la+'" lon="'+f.lo+'"><name>'+esc(f.name)+'</name><desc>'+esc((KINDS[f.kind]?KINDS[f.kind].l+'. ':'')+f.note)+'</desc>'+iso(f.ts)+'</wpt>\n';
+    else if(f.pts.length>1){const poly=f.type==='sector'||f.type==='area',pts=poly?f.pts.concat([f.pts[0]]):f.pts;o+='<trk><name>'+esc((f.type==='sector'?'Sector: ':f.type==='area'?'Area: ':'')+f.name)+'</name><trkseg>'+pts.map(q=>'<trkpt lat="'+q[0]+'" lon="'+q[1]+'"/>').join('')+'</trkseg></trk>\n'}}
+  return o+'</gpx>\n'}
+function toGeo(){return {type:'FeatureCollection',...(frOn()&&incident().name?{name:incidentLabel()}:{}),features:[...features.values()].filter(f=>f.type==='pin'||f.pts.length>((f.type==='sector'||f.type==='area')?2:1)).map(f=>({type:'Feature',properties:{title:f.name,description:f.note,type:f.type,kind:f.kind,status:f.status,team:f.team,who:f.who,time:f.ts?new Date(f.ts).toISOString():'',winds:f.winds,radius:f.radius},geometry:f.type==='pin'?{type:'Point',coordinates:[f.lo,f.la]}:f.type==='track'?{type:'LineString',coordinates:f.pts.map(q=>[q[1],q[0]])}:{type:'Polygon',coordinates:[f.pts.concat([f.pts[0]]).map(q=>[q[1],q[0]])]}}))}}
+function exportFile(fmt){if(!can('files')){upsell('files');return}if(!features.size){toast('Nothing to save yet.');return}fmt==='gpx'?saveFile('ridgeline.gpx',toGpx()):saveFile('ridgeline.geojson',JSON.stringify(toGeo(),null,2))}
+async function importFile(file){
+  const items=[];let txt;
+  try{txt=await file.text();
+    if(/\.gpx$/i.test(file.name)||txt.trimStart().startsWith('<')){
+      const doc=new DOMParser().parseFromString(txt,'application/xml');if(doc.querySelector('parsererror'))throw new Error('xml');
+      const t1=(el,tag)=>{const n=el.querySelector(tag);return n?n.textContent:''};
+      doc.querySelectorAll('wpt').forEach(w=>{const la=+w.getAttribute('lat'),lo=+w.getAttribute('lon');if(isFinite(la)&&isFinite(lo))items.push({type:'pin',kind:'waypoint',name:t1(w,'name')||'Waypoint',note:t1(w,'desc'),la,lo})});
+      doc.querySelectorAll('trk').forEach(t=>{const pts=[...t.querySelectorAll('trkpt')].map(q=>[+q.getAttribute('lat'),+q.getAttribute('lon')]).filter(q=>isFinite(q[0])&&isFinite(q[1]));if(pts.length>1)items.push({type:'track',kind:'track',name:t1(t,'name')||'Track',pts})})
+    }else{
+      const j=JSON.parse(txt),fs=j.type==='FeatureCollection'?j.features:j.type==='Feature'?[j]:[],ok=c=>Array.isArray(c)&&isFinite(c[0])&&isFinite(c[1]);
+      for(const ft of fs){const g=ft&&ft.geometry,pr=(ft&&ft.properties)||{};if(!g)continue;const nm=String(pr.title||pr.name||'Imported'),nt=String(pr.description||'');
+        if(g.type==='Point'&&ok(g.coordinates))items.push({type:'pin',kind:pr.kind,name:nm,note:nt,la:g.coordinates[1],lo:g.coordinates[0],winds:pr.winds,radius:pr.radius});
+        else if(g.type==='LineString'&&g.coordinates.every(ok))items.push({type:'track',kind:pr.kind==='route'?'route':'track',name:nm,note:nt,pts:g.coordinates.map(c=>[c[1],c[0]])});
+        else if(g.type==='Polygon'&&g.coordinates[0]&&g.coordinates[0].every(ok))items.push({type:pr.type==='area'?'area':'sector',kind:pr.type==='area'?'area':'sector',name:nm,note:nt,status:pr.status,team:pr.team,pts:g.coordinates[0].slice(0,-1).map(c=>[c[1],c[0]])})}}
+  }catch(e){toast('That file could not be read. Use a GPX or GeoJSON file.');return}
+  let n=0,last=null;
+  for(const it of items.slice(0,300)){if(it.pts&&it.pts.length>1500){const k=Math.ceil(it.pts.length/1500);it.pts=it.pts.filter((_,i)=>i%k===0)}
+    const f=normFeat(newId(),{...it,who:'imported',by:uid,ts:Date.now()});if(!isFinite(f.la)||!isFinite(f.lo))continue;await saveFeature(f);last=f;n++}
+  toast(n?'Imported '+n+' item'+(n>1?'s':'')+'.':'No waypoints, tracks or areas found.');if(last){view.lat=last.la;view.lon=last.lo;redraw()}}
+function openLog(){
+  const list=[...features.values()].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const title=f=>f.type==='area'?f.name+' · '+fmtArea(areaM2(f.pts)):f.kind==='checkin'?(f.who||'Someone')+' checked in':f.type==='sector'?f.name+' · '+STATUS[f.status].l+(f.team?' · '+teamName(f.team):''):f.type==='track'?f.name+' · '+fmtDist(pathLen(f.pts)):f.name+' · '+(KINDS[f.kind]||KINDS.waypoint).l;
+  openSheet([h('h2',{text:'Log'}),h('div',{class:'stat',text:list.length?'Newest first. Tap an item to see it on the map.':'Nothing added yet.'}),
+    ...list.map(f=>h('button',{class:'item',onclick:()=>{view.lat=f.la;view.lon=f.lo;view.mpp=Math.min(view.mpp,10);redraw();closeSheet()}},h('span',{},h('div',{style:'font-weight:600',text:title(f)}),h('div',{class:'m',text:(f.ts?ago(f.ts):'')+(f.who?' · '+f.who:'')+(tmOf(f.team)&&f.type!=='sector'?' · '+tmOf(f.team).l:'')})))),
+    h('div',{class:'row'},h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+function openMenu(){
+  const name=h('input',{class:'in',maxlength:'24','aria-label':'Your name'});name.value=callsign();name.addEventListener('change',()=>LS.set('callsign',name.value.trim()||callsign()));
+  const go=h('input',{class:'in',placeholder:'45.1234, -90.5678','aria-label':'Coordinates'});
+  const units_=h('div',{class:'row'});
+  const drawU=()=>units_.replaceChildren(h('button',{class:'chip','aria-pressed':String(units==='imp'),text:'Feet and miles',onclick:()=>{units='imp';LS.set('units',units);drawU();drawWindBtn();redraw()}}),h('button',{class:'chip','aria-pressed':String(units==='met'),text:'Metres and km',onclick:()=>{units='met';LS.set('units',units);drawU();drawWindBtn();redraw()}}));drawU();
+  const file=h('input',{type:'file',accept:'.json,.geojson,.gpx,application/json,application/gpx+xml,text/xml',style:'display:none'});file.addEventListener('change',()=>{if(file.files[0])importFile(file.files[0]);file.value=''});
+  openSheet([h('h2',{text:'Menu'}),
+    ...membershipSection(),
+    ...responderSection(),
+    h('div',{class:'row'},h('button',{class:'btn',text:'Log of everything on the map',onclick:openLog}),h('button',{class:'btn',text:'Projected routes',onclick:openProj}),h('button',{class:'btn',text:'Share with QR code',onclick:openShare}),h('button',{class:'btn',text:'Feedback and ideas',onclick:openFeedback})),
+    h('div',{class:'lbl',text:'Your name'}),name,
+    h('div',{class:'lbl',text:'Units'}),units_,
+    ...bgSection(),
+    ...terrainSection(),
+    ...installSection(),
+    h('div',{class:'lbl',text:'Go to coordinates'}),go,
+    h('div',{class:'row'},h('button',{class:'btn',text:'Go',onclick:()=>{const m=go.value.match(/(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)/);if(!m||Math.abs(+m[1])>90||Math.abs(+m[2])>180){toast('Enter latitude and longitude, like 45.1234, -90.5678.');return}view.lat=+m[1];view.lon=+m[2];view.mpp=Math.min(view.mpp,10);redraw();closeSheet()}})),
+    h('div',{class:'lbl',text:'Files'}),
+    h('div',{class:'row'},h('button',{class:'btn',text:'Save as GPX',onclick:()=>exportFile('gpx')}),h('button',{class:'btn',text:'Save as GeoJSON',onclick:()=>exportFile('geojson')}),h('button',{class:'btn',text:'Import a file',onclick:()=>{if(!can('files')){upsell('files');return}file.click()}}),file),
+    h('div',{class:'note',text:'GPX and GeoJSON open in CalTopo, Garmin and most mapping apps. Import adds waypoints, tracks and areas from a file.'}),
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Close',onclick:closeSheet})),
+    h('div',{class:'note',text:'Places are saved on this device. The forecast and map images need an internet connection.'})])}
+$('#menuBtn').addEventListener('click',openMenu);
+
+/* crew chat, scrambled in the browser with a shared code */
+let key=null,msgs=[],renderSeq=0;const dec=new Map();
+const b64=u=>{let s='';for(let i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return btoa(s)};
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function deriveKey(pass){const enc=new TextEncoder(),km=await crypto.subtle.importKey('raw',enc.encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:enc.encode('ridgeline-crew-v1'),iterations:200000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function unlock(pass){try{key=await deriveKey(pass);dec.clear();LS.set('pass',pass);renderChat()}catch(e){toast('Chat could not start in this view.')}}
+async function renderChat(){
+  const gate=$('#gate'),list=$('#chatList'),comp=$('#composer');
+  if(!dbh)return;
+  if(!key){gate.hidden=false;list.hidden=true;comp.hidden=true;const pi=h('input',{class:'in',type:'password',placeholder:'Crew code','aria-label':'Crew code',autocomplete:'off'});
+    gate.replaceChildren(h('h2',{text:'Join your crew'}),h('p',{text:'Pick a crew code and tell your crew in person. Everyone types the same one.'}),pi,h('div',{class:'row'},h('button',{class:'btn primary',text:'Join',onclick:()=>{if(pi.value.length<6){toast('Use at least 6 characters.');return}unlock(pi.value)}})),
+      h('p',{class:'note',text:'Messages are scrambled with this code before they are stored. This is not Signal: anyone with the code can read the whole history.'}));return}
+  gate.hidden=true;list.hidden=false;comp.hidden=false;
+  const seq=++renderSeq,rows=[];
+  for(const m of msgs){if(!dec.has(m.id)){try{const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(m.iv)},key,unb64(m.ct));dec.set(m.id,JSON.parse(new TextDecoder().decode(pt)))}catch(e){dec.set(m.id,null)}}rows.push([m,dec.get(m.id)])}
+  if(seq!==renderSeq)return;
+  const near=list.scrollHeight-list.scrollTop-list.clientHeight<80;
+  list.replaceChildren(...(rows.length?rows.map(([m,d])=>{const mine=m.u===uid;if(!d)return h('div',{class:'msg bad',text:'This message was sent with a different crew code.'});
+    return h('div',{class:'msg'+(mine?' me':'')},h('div',{class:'who',text:(mine?'You':String(d.n||'Crew').slice(0,24))+' · '+new Date(m.ts).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}),h('div',{text:String(d.t||'')}))}):[h('div',{class:'note',text:'No messages yet. Say something to the crew.'})]));
+  if(near)list.scrollTop=list.scrollHeight}
+async function send(){
+  const inp=$('#msgin'),t=inp.value.trim();if(!t||!key||!dbh)return;inp.value='';
+  try{const iv=crypto.getRandomValues(new Uint8Array(12)),ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify({n:callsign(),t})));
+    await dbh.collection('chat').add({u:uid,ts:Date.now(),iv:b64(iv),ct:b64(new Uint8Array(ct))})}
+  catch(e){inp.value=t;toast('Message not sent. Check your connection.')}}
+$('#sendbtn').addEventListener('click',send);
+$('#msgin').addEventListener('keydown',e=>{if(e.key==='Enter')send()});
+
+/* start */
+drawWindBtn();
+LS.get('features',[]).forEach(f=>{if(f&&f.id){const n=normFeat(f.id,f);if(isFinite(n.la)&&isFinite(n.lo))features.set(n.id,n)}});
+resize();redraw();wxFetch();
+(async()=>{
+  const c=window.claude;if(!c||!c.use)return;
+  try{const u=await c.use('user'),id=u&&await u.id();if(id){uid=id;LS.set('uid',id)}}catch(e){}
+  try{dbh=await c.use('db')}catch(e){dbh=null}
+  if(!dbh)return;
+  $('#nav').hidden=false;
+  const localOnly=[...features.values()];features.clear();
+  dbh.collection('features').onSnapshot(snap=>{snap.docChanges().forEach(ch=>{if(ch.type==='removed')features.delete(ch.doc.id);else{const f=fromDoc(ch.doc.id,ch.doc.data());if(isFinite(f.la)&&isFinite(f.lo))features.set(f.id,f)}});redraw()},()=>{});
+  dbh.collection('chat').orderBy('ts','desc').limit(150).onSnapshot(s=>{msgs=s.docs.map(d=>({id:d.id,...d.data()})).reverse();if($('#chat').classList.contains('on'))renderChat()},()=>{});
+  if(localOnly.length){let okAll=true;for(const f of localOnly){try{await dbh.collection('features').doc(f.id).set(toDoc(f))}catch(e){okAll=false;break}}
+    if(okAll){LS.set('features',[]);toast('Moved your saved places to the shared map.')}else{localOnly.forEach(f=>features.set(f.id,f));redraw();toast('Your saved places stay on this device. This view cannot add to the shared map.')}}
+  const sp=LS.get('pass',null);if(sp)unlock(sp);
+})();
+})();
+</script>
+</body>
+</html>
