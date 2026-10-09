@@ -207,6 +207,11 @@ const MEMBERSHIP={
    email: shown to people as a fallback if no formUrl is set.
    On the shared claude.ai page, messages are stored in the page's own database. */
 const CONTACT={formUrl:'',email:''};
+/* Map and data services.
+   esriKey: ArcGIS Location Platform API key for the worldwide maps (needed for a paid app).
+   openMeteoKey: Open-Meteo commercial API key for weather, elevation and marine data (needed for a paid app).
+   Leave both empty while testing. */
+const SERVICES={esriKey:'',openMeteoKey:''};
 /* ========================================================================== */
 const QR=(()=>{
   const EC=[0,[10,1,16,0],[16,1,28,0],[26,1,44,0],[18,2,32,0],[24,2,43,0],[16,4,27,0],[18,4,31,0],[22,2,38,2],[22,3,36,2],[26,4,43,1],[30,1,50,4],[22,6,36,2],[22,8,37,1],[24,4,40,5],[24,5,41,5]];
@@ -251,7 +256,7 @@ const tmOf=v=>{if(!v)return null;if(TMAP[v])return TMAP[v];if(v[0]!=='~')return 
 const mkTeam=(l,c,g)=>'~'+l.replace(/~/g,'').slice(0,20)+'~'+c+'~'+Array.from(g).slice(0,2).join('');
 const savedTeams=()=>{const a=LS.get('myteams',[]);return Array.isArray(a)?a.filter(v=>typeof v==='string'&&tmOf(v)):[]};
 const allTeams=()=>[...TEAMS,...savedTeams().map(tmOf)];
-const KINDS={waypoint:{l:'Waypoint',c:'#5F6B64',g:'•'},trailhead:{l:'Trailhead',c:'#6B7785',g:'P'},camp:{l:'Camp',c:'#8250B0',g:'T'},water:{l:'Water',c:'#1E9A94',g:'W'},hazard:{l:'Hazard',c:'#B7410E',g:'H'},stand:{l:'Stand',c:'#D9480F',g:'S'},camera:{l:'Camera',c:'#2F6FB5',g:'C'},lkp:{l:'Last known point',c:'#C0392B',g:'L'},clue:{l:'Clue',c:'#C79100',g:'!'},checkin:{l:'Check-in',c:'#2563B8',g:'✓'}};
+const KINDS={waypoint:{l:'Waypoint',c:'#5F6B64',g:'•'},trailhead:{l:'Trailhead',c:'#6B7785',g:'P'},camp:{l:'Camp',c:'#8250B0',g:'T'},water:{l:'Water',c:'#1E9A94',g:'W'},hazard:{l:'Hazard',c:'#B7410E',g:'H'},stand:{l:'Stand',c:'#D9480F',g:'S'},camera:{l:'Camera',c:'#2F6FB5',g:'C'},mob:{l:'Person in water',c:'#E11D48',g:'M'},lkp:{l:'Last known point',c:'#C0392B',g:'L'},clue:{l:'Clue',c:'#C79100',g:'!'},checkin:{l:'Check-in',c:'#2563B8',g:'✓'}};
 const OCT=['N','NE','E','SE','S','SW','W','NW'];
 const octOf=d=>OCT[Math.round(((d%360)+360)%360/45)%8];
 
@@ -270,7 +275,7 @@ const teamName=t=>tmOf(t)?tmOf(t).l:(t||'');
 /* geo */
 const hav=(a,b)=>{const dLa=(b[0]-a[0])*rad,dLo=(b[1]-a[1])*rad,s=Math.sin(dLa/2)**2+Math.cos(a[0]*rad)*Math.cos(b[0]*rad)*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(s))};
 const bearing=(a,b)=>{const y=Math.sin((b[1]-a[1])*rad)*Math.cos(b[0]*rad),x=Math.cos(a[0]*rad)*Math.sin(b[0]*rad)-Math.sin(a[0]*rad)*Math.cos(b[0]*rad)*Math.cos((b[1]-a[1])*rad);return (Math.atan2(y,x)/rad+360)%360};
-function fmtDist(m){if(units==='imp'){const ft=m*3.28084;return ft<1100?Math.round(ft)+' ft':(m/1609.344).toFixed(2)+' mi'}return m<1000?Math.round(m)+' m':(m/1000).toFixed(2)+' km'}
+function fmtDist(m){if(units==='nau')return m<370?Math.round(m*1.0936)+' yd':(m/1852).toFixed(2)+' nm';if(units==='imp'){const ft=m*3.28084;return ft<1100?Math.round(ft)+' ft':(m/1609.344).toFixed(2)+' mi'}return m<1000?Math.round(m)+' m':(m/1000).toFixed(2)+' km'}
 const fmtLL0=(la,lo)=>la.toFixed(5)+', '+lo.toFixed(5);
 function usng(la,lo){
   if(!(la>=-80&&la<84))return 'Polar area, grid not shown';
@@ -290,7 +295,7 @@ const fmtLL=(la,lo)=>frOn()?usng(la,lo)+' · '+fmtLL0(la,lo):fmtLL0(la,lo);
 const mLon=()=>111320*Math.cos(view.lat*rad);
 const toXY=(la,lo)=>[W/2+(lo-view.lon)*mLon()/view.mpp,H/2-(la-view.lat)*111320/view.mpp];
 const fromXY=(x,y)=>[view.lat-(y-H/2)*view.mpp/111320,view.lon+(x-W/2)*view.mpp/mLon()];
-const mph2=v=>units==='imp'?Math.round(v)+' mph':Math.round(v*1.609)+' km/h';
+const mph2=v=>units==='nau'?Math.round(v*.868976)+' kn':units==='imp'?Math.round(v)+' mph':Math.round(v*1.609)+' km/h';
 
 /* ui helpers */
 let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),3000)}
@@ -307,19 +312,21 @@ const STATUS={todo:{l:'Not started',c:'#6B7785'},assigned:{l:'Assigned',c:'#2563
 const centroid=p=>[p.reduce((s,q)=>s+q[0],0)/p.length,p.reduce((s,q)=>s+q[1],0)/p.length];
 const pathLen=p=>{let d=0;for(let i=1;i<p.length;i++)d+=hav(p[i-1],p[i]);return d};
 function areaM2(p){const lat0=p.reduce((s,q)=>s+q[0],0)/p.length,kx=111320*Math.cos(lat0*rad),ky=111320;let a=0;for(let i=0;i<p.length;i++){const j=(i+1)%p.length;a+=(p[i][1]*kx)*(p[j][0]*ky)-(p[j][1]*kx)*(p[i][0]*ky)}return Math.abs(a)/2}
-const fmtArea=m2=>units==='imp'?(m2/4046.856).toFixed(1)+' acres':(m2/10000).toFixed(1)+' ha';
+const fmtArea=m2=>units==='nau'&&m2>342990?(m2/3429904).toFixed(2)+' sq nm':units!=='met'?(m2/4046.856).toFixed(1)+' acres':(m2/10000).toFixed(1)+' ha';
 function inPoly(x,y,P){let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){if((P[i][1]>y)!==(P[j][1]>y)&&x<(P[j][0]-P[i][0])*(y-P[i][1])/(P[j][1]-P[i][1])+P[i][0])c=!c}return c}
 function segDist(px,py,a,b){const vx=b[0]-a[0],vy=b[1]-a[1],l=vx*vx+vy*vy;let t=l?((px-a[0])*vx+(py-a[1])*vy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-(a[0]+t*vx),py-(a[1]+t*vy))}
 function ago(ts){const m=Math.round((Date.now()-ts)/60000);if(m<1)return 'just now';if(m<60)return m+' min ago';const hh=Math.floor(m/60);return hh<24?hh+' h ago':Math.floor(hh/24)+' d ago'}
 const base=()=>({id:newId(),note:'',winds:[],pts:[],status:'todo',seen:0,team:myTeam(),radius:0,who:callsign(),by:uid,ts:Date.now()});
 const TYPES=['pin','sector','track','area'];const AREA_C='#FF8C1A';
+const LEEWAY={piw:{l:'Person in water',k:.010,dv:10},pfd:{l:'Person in life jacket',k:.015,dv:15},kayak:{l:'Kayak or canoe',k:.020,dv:25},sup:{l:'Paddleboard',k:.025,dv:25},skiff:{l:'Small open boat',k:.035,dv:30},raft:{l:'Life raft',k:.040,dv:30},debris:{l:'Cooler or debris',k:.030,dv:30}};
+function normDrift(d){if(!d||typeof d!=='object')return null;const o=LEEWAY[d.o]?d.o:'piw',cs=Math.max(0,Math.min(10,+d.cs||0)),cd=((+d.cd||0)%360+360)%360;return {o,cs,cd}}
 function normFeat(id,d){
   const type=TYPES.includes(d.type)?d.type:'pin';
   const pts=Array.isArray(d.pts)?d.pts.filter(p=>Array.isArray(p)&&isFinite(p[0])&&isFinite(p[1])).slice(0,2000).map(p=>[+p[0],+p[1]]):[];
   let la=+d.la,lo=+d.lo;if(type!=='pin'&&pts.length){const c=centroid(pts);la=c[0];lo=c[1]}
   const kind=type==='pin'?(KINDS[d.kind]?d.kind:'waypoint'):(type==='track'&&d.kind==='route'?'route':type);
-  return{id,type,kind,name:String(d.name||'').slice(0,80),note:String(d.note||'').slice(0,1000),winds:Array.isArray(d.winds)?d.winds.filter(w=>OCT.includes(w)):[],la,lo,pts,status:STATUS[d.status]?d.status:'todo',team:String(d.team||'').slice(0,80),radius:isFinite(d.radius)?Math.max(0,+d.radius):0,who:String(d.who||'').slice(0,40),by:String(d.by||''),ts:isFinite(d.ts)?+d.ts:0,seen:isFinite(d.seen)?+d.seen:0}}
-const toDoc=f=>({type:f.type,kind:f.kind,name:f.name,note:f.note,winds:f.winds,la:f.la,lo:f.lo,pts:f.pts.map(p=>[+p[0].toFixed(6),+p[1].toFixed(6)]),status:f.status,team:f.team,radius:f.radius,who:f.who,by:f.by||uid,ts:f.ts||Date.now(),seen:f.seen||0});
+  return{id,type,kind,name:String(d.name||'').slice(0,80),note:String(d.note||'').slice(0,1000),winds:Array.isArray(d.winds)?d.winds.filter(w=>OCT.includes(w)):[],la,lo,pts,status:STATUS[d.status]?d.status:'todo',team:String(d.team||'').slice(0,80),radius:isFinite(d.radius)?Math.max(0,+d.radius):0,who:String(d.who||'').slice(0,40),by:String(d.by||''),ts:isFinite(d.ts)?+d.ts:0,seen:isFinite(d.seen)?+d.seen:0,drift:normDrift(d.drift)}}
+const toDoc=f=>({type:f.type,kind:f.kind,name:f.name,note:f.note,winds:f.winds,la:f.la,lo:f.lo,pts:f.pts.map(p=>[+p[0].toFixed(6),+p[1].toFixed(6)]),status:f.status,team:f.team,radius:f.radius,who:f.who,by:f.by||uid,ts:f.ts||Date.now(),seen:f.seen||0,...(f.drift?{drift:f.drift}:{})});
 const fromDoc=normFeat;
 const latestBy=new Map();
 function calcLatest(){latestBy.clear();for(const f of features.values())if(f.kind==='checkin'){const k=f.by||f.who,c=features.get(latestBy.get(k));if(!c||f.ts>c.ts)latestBy.set(k,f.id)}}
@@ -330,12 +337,24 @@ const windOk=f=>{if(f.kind!=='stand'||!f.winds.length||!wind)return null;return 
 
 /* map background: USGS satellite and topo tiles, optionally saved for offline */
 const SHARED=!!(window.claude&&window.claude.use);
-let bg=SHARED?'grid':LS.get('bg','hybrid');if(!SHARED&&!['grid','sat','hybrid','topo','relief'].includes(bg))bg='hybrid';
+const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/',ek_=()=>SERVICES.esriKey?'?token='+encodeURIComponent(SERVICES.esriKey):'';
+const mercBox=(z,x,y)=>{const S=40075016.68557849/2**z,o=20037508.342789244;return [-o+x*S,o-(y+1)*S,-o+(x+1)*S,o-y*S]};
 const TILE={
+  whyb:{n:'Hybrid',f:(z,x,y)=>ESRI+'World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+ek_(),ov:'wlab',max:18,kb:40,a:'Imagery: Esri, Maxar, Earthstar Geographics'},
+  wsat:{n:'Satellite',f:(z,x,y)=>ESRI+'World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+ek_(),max:18,kb:30,a:'Imagery: Esri, Maxar, Earthstar Geographics'},
+  wtopo:{n:'Topo',f:(z,x,y)=>ESRI+'World_Topo_Map/MapServer/tile/'+z+'/'+y+'/'+x+ek_(),max:18,kb:25,a:'Topo: Esri and contributors'},
+  wlab:{n:'Labels',f:(z,x,y)=>ESRI+'Reference/World_Boundaries_and_Places/MapServer/tile/'+z+'/'+y+'/'+x+ek_(),max:18,kb:10,a:'',overlay:true},
+  chart:{n:'Nautical chart (US)',f:(z,x,y)=>'https://gis.charttools.noaa.gov/arcgis/rest/services/MCS/NOAAChartDisplay/MapServer/exts/MaritimeChartService/MapServer/export?bbox='+mercBox(z,x,y).join(',')+'&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=false&f=image',max:17,kb:30,a:'Charts: NOAA Office of Coast Survey. Not for navigation.'},
+  seamark:{n:'Sea marks',f:(z,x,y)=>'https://tiles.openseamap.org/seamark/'+z+'/'+x+'/'+y+'.png',max:18,kb:8,a:'',overlay:true},
   sat:{n:'Satellite',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/',max:16,kb:30,a:'Imagery: USGS National Map'},
   hybrid:{n:'Hybrid',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/',max:16,kb:35,a:'Imagery and topo: USGS National Map'},
   relief:{n:'Relief',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/',max:15,kb:20,a:'Shaded relief: USGS National Map'},
   topo:{n:'Topo',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/',max:16,kb:25,a:'Topo: USGS National Map'}};
+const BASES=['grid','whyb','wsat','wtopo','hybrid','sat','topo','relief','chart'];
+let bg=SHARED?'grid':LS.get('bg','whyb');if(!SHARED&&!BASES.includes(bg))bg='whyb';
+let seaOn=!SHARED&&!!LS.get('seamarks',false);
+const tileUrl=(l,z,x,y)=>{const t=TILE[l];return t.f?t.f(z,x,y):t.u+z+'/'+y+'/'+x};
+const layersOf=b=>[b,...(TILE[b]&&TILE[b].ov?[TILE[b].ov]:[]),...(seaOn?['seamark']:[])].filter(l=>TILE[l]);
 const tx=(lon,z)=>(lon+180)/360*2**z;
 const ty=(lat,z)=>{const s=Math.sin(lat*rad);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*2**z};
 const tlon=(x,z)=>x/2**z*360-180;
@@ -358,19 +377,20 @@ function getTile(layer,z,x,y){
 async function loadTile(layer,z,x,y,k){
   let img=null;
   try{const blob=await idbGet(k);if(blob)img=typeof createImageBitmap==='function'?await createImageBitmap(blob):await new Promise(res=>{const u=URL.createObjectURL(blob),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);res(i)};i.onerror=()=>{URL.revokeObjectURL(u);res(null)};i.src=u})}catch(e){}
-  if(!img)img=await new Promise(res=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>res(null);i.src=TILE[layer].u+z+'/'+y+'/'+x});
+  if(!img)img=await new Promise(res=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>res(null);i.src=tileUrl(layer,z,x,y)});
   tpend.delete(k);tcache.set(k,{img,t:Date.now()});if(img)tOk++;else{tFail++;if(!tOk)redraw()}
-  if(tcache.size>400)tcache.delete(tcache.keys().next().value);
-  if(img&&layer===bg)redraw()}
+  if(tcache.size>700)tcache.delete(tcache.keys().next().value);
+  if(img&&layersOf(bg).includes(layer))redraw()}
 function drawTiles(){
-  const z=zFor(),n=2**z,tl=fromXY(0,0),br=fromXY(W,H);
-  const x0=Math.floor(tx(tl[1],z)),x1=Math.floor(tx(br[1],z)),y0=Math.floor(ty(tl[0],z)),y1=Math.floor(ty(br[0],z));
-  if((x1-x0+1)*(y1-y0+1)>150)return;
-  for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){
-    if(y<0||y>=n)continue;
-    const im=getTile(bg,z,((x%n)+n)%n,y);if(!im)continue;
-    const a=toXY(tlat(y,z),tlon(x,z)),b=toXY(tlat(y+1,z),tlon(x+1,z));
-    ctx.drawImage(im,a[0],a[1],b[0]-a[0]+0.5,b[1]-a[1]+0.5)}}
+  const zb=zFor(),tl=fromXY(0,0),br=fromXY(W,H);
+  for(const l of layersOf(bg)){const z=Math.min(zb,TILE[l].max),n=2**z;
+    const x0=Math.floor(tx(tl[1],z)),x1=Math.floor(tx(br[1],z)),y0=Math.floor(ty(tl[0],z)),y1=Math.floor(ty(br[0],z));
+    if((x1-x0+1)*(y1-y0+1)>150)continue;
+    for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){
+      if(y<0||y>=n)continue;
+      const im=getTile(l,z,((x%n)+n)%n,y);if(!im)continue;
+      const a=toXY(tlat(y,z),tlon(x,z)),b=toXY(tlat(y+1,z),tlon(x+1,z));
+      ctx.drawImage(im,a[0],a[1],b[0]-a[0]+0.5,b[1]-a[1]+0.5)}}}
 function planTiles(){
   const tl=fromXY(-W*.25,-H*.25),br=fromXY(W*1.25,H*1.25),z0=Math.max(2,zFor()-1);let zmax=Math.min(TILE[bg].max,z0+3),list;
   for(;;){list=[];
@@ -379,17 +399,17 @@ function planTiles(){
   return list}
 async function openOffline(){
   if(!can('offline')){upsell('offline');return}
-  if(bg==='grid'){bg='sat';LS.set('bg',bg);redraw()}
-  const layer=bg,t=TILE[layer],list=planTiles();
+  if(bg==='grid'){bg='whyb';LS.set('bg',bg);redraw()}
+  const t=TILE[bg],lays=layersOf(bg),list=planTiles().flatMap(q=>lays.filter(l=>q[0]<=TILE[l].max).map(l=>[l,...q]));
   if(list.length>2000){toast('Zoom in to the area you want to save, then try again.');return}
-  const mb=Math.max(1,Math.round(list.length*t.kb/1024)),have=await idbCount();
+  const mb=Math.max(1,Math.round(list.reduce((a,q)=>a+TILE[q[0]].kb,0)/1024)),have=await idbCount();
   let cancel=false,running=false;
   const st=h('div',{class:'stat',text:t.n+' for the area on screen plus a margin: '+list.length+' tiles, about '+mb+' MB. Do this on Wi-Fi.'});
   const go=h('button',{class:'btn primary',text:'Save area',onclick:async()=>{
     if(running)return;running=true;cancel=false;go.disabled=true;
     let done=0,fail=0,i=0,blocked=false;
-    const work=async()=>{while(!cancel&&!blocked&&i<list.length){const [z,x,y]=list[i++],k=layer+'/'+z+'/'+x+'/'+y;
-      try{if(!(await idbHas(k))){const r=await fetch(t.u+z+'/'+y+'/'+x);if(!r.ok)throw new Error('http');await idbPut(k,await r.blob())}done++}
+    const work=async()=>{while(!cancel&&!blocked&&i<list.length){const [layer,z,x,y]=list[i++],k=layer+'/'+z+'/'+x+'/'+y;
+      try{if(!(await idbHas(k))){const r=await fetch(tileUrl(layer,z,x,y));if(!r.ok)throw new Error('http');await idbPut(k,await r.blob())}done++}
       catch(e){fail++;if(done===0&&fail>=3)blocked=true}
       st.textContent='Saved '+done+' of '+list.length+(fail?' ('+fail+' failed)':'')+'…'}};
     await Promise.all([work(),work(),work(),work()]);
@@ -545,6 +565,65 @@ function exportIncident(){
   saveFile('incident-log'+(i.num?'-'+i.num.replace(/[^\w-]+/g,''):'')+'.csv',rows.join('\r\n')+'\r\n')}
 function membershipSection(){if(SHARED||!MEMBERSHIP.paywall)return [];return [h('div',{class:'lbl',text:'Membership'}),h('div',{class:'row'},h('span',{class:'stat',style:'align-self:center',text:'Ridgeline '+planName(plan())}),h('button',{class:'btn',text:plan()==='pro'?'Manage':'See plans',onclick:openPlans}))]}
 setTimeout(recheck,4000);
+/* water search: drift, patterns, survival */
+function driftOf(f){
+  if(!f||f.kind!=='mob'||!f.drift)return null;const d=f.drift,L=LEEWAY[d.o]||LEEWAY.piw,el=Math.max(0,(Date.now()-(f.seen||f.ts||Date.now()))/1000);
+  const wMs=wind?wind.mph*.44704:0,dw=wind?(wind.from+180)%360:0,lw=L.k*wMs,cur=d.cs*.514444;
+  const vec=(sp,dir)=>[sp*Math.sin(dir*rad),sp*Math.cos(dir*rad)],c=vec(cur,d.cd);
+  const at=ang=>{const l=vec(lw,ang),vx=c[0]+l[0],vy=c[1]+l[1],sp=Math.hypot(vx,vy),br=(Math.atan2(vx,vy)/rad+360)%360;return sp>0?dest([f.la,f.lo],br,sp*el):[f.la,f.lo]};
+  const datum=at(dw),Lp=at(dw-L.dv),Rp=at(dw+L.dv),dist=hav([f.la,f.lo],datum);
+  return {datum,L:Lp,R:Rp,dist,brg:dist>1?bearing([f.la,f.lo],datum):0,radius:185+.3*dist+.5*hav(Lp,Rp),el,noWind:!wind}}
+function survivalText(c){const F=c*9/5+32;
+  const t=F<32?'under 15 to 45 minutes':F<40?'30 to 90 minutes':F<50?'1 to 3 hours':F<60?'1 to 6 hours':F<70?'2 to 40 hours':F<80?'3 hours to indefinite':'indefinite';
+  return 'Water about '+tC2(c)+'. US Coast Guard reference for expected survival: '+t+'. This varies widely with clothing, life jackets and body type, and people have survived much longer. Never shorten a search because of it.'}
+async function marineAt(la,lo){
+  const u=om('https://marine-api.open-meteo.com/v1/marine?latitude='+la.toFixed(3)+'&longitude='+lo.toFixed(3)+'&hourly=ocean_current_velocity,ocean_current_direction,sea_surface_temperature,wave_height&forecast_days=1&timezone=GMT');
+  const r=await fetch(u);if(!r.ok)throw new Error('marine '+r.status);const j=await r.json(),H_=j.hourly||{},T=(H_.time||[]).map(t=>Date.parse(t+'Z'));
+  let i=0,b=Infinity;T.forEach((t,n)=>{const d=Math.abs(t-Date.now());if(d<b){b=d;i=n}});
+  const g=k=>H_[k]&&Number.isFinite(H_[k][i])?H_[k][i]:null;return {cur:g('ocean_current_velocity'),dir:g('ocean_current_direction'),sst:g('sea_surface_temperature'),wave:g('wave_height')}}
+function waterBox(f){
+  if(f.kind!=='mob')return null;if(!f.drift)f.drift={o:'piw',cs:0,cd:0};
+  const box=h('div',{}),oc=h('div',{class:'row'}),cs=h('input',{class:'in',type:'number',min:'0',max:'10',step:'0.1',inputmode:'decimal','aria-label':'Current speed in knots'}),cd=h('input',{class:'in',type:'number',min:'0',max:'359',step:'1',inputmode:'numeric','aria-label':'Current flowing toward, degrees'});
+  cs.value=f.drift.cs;cd.value=f.drift.cd;const info=h('div',{class:'stat'}),fc=h('div',{class:'note'});
+  const save=()=>{f.drift={...f.drift,cs:Math.max(0,+cs.value||0),cd:((+cd.value||0)%360+360)%360};saveFeature(f);upd()};
+  const upd=()=>{const d=driftOf(f);if(!d){info.textContent='';return}
+    info.textContent=(d.noWind?'No wind set, so only the current is used. Tap the wind button at the top to add it. ':'')+'Estimated drift datum: '+fmtDist(d.dist)+' toward '+Math.round(d.brg)+'° ('+octOf(d.brg)+') after '+fmtDur(d.el)+'. Search radius about '+fmtDist(d.radius)+'.'};
+  const dO=()=>oc.replaceChildren(...Object.entries(LEEWAY).map(([k,v])=>h('button',{class:'chip','aria-pressed':String(f.drift.o===k),text:v.l,onclick:()=>{f.drift={...f.drift,o:k};saveFeature(f);dO();upd()}})));dO();
+  cs.addEventListener('change',save);cd.addEventListener('change',save);
+  const fcBtn=h('button',{class:'btn',text:'Use forecast current',onclick:async()=>{if(SHARED){fc.textContent='This shared page cannot load marine forecasts.';return}fcBtn.disabled=true;fc.textContent='Loading marine forecast…';
+    try{const m=await marineAt(f.la,f.lo);fcBtn.disabled=false;
+      if(m.cur!=null&&m.dir!=null){cs.value=(m.cur/1.852).toFixed(1);cd.value=Math.round(m.dir);save()}
+      fc.textContent=[m.cur!=null?'Forecast current '+(m.cur/1.852).toFixed(1)+' kn toward '+Math.round(m.dir)+'°':'No current forecast here',m.wave!=null?'waves '+(units==='met'?m.wave.toFixed(1)+' m':Math.round(m.wave*3.28)+' ft'):''].filter(Boolean).join(' · ')+'. The model is about 8 km across and not reliable close to shore; use local tide and current tables there.';
+      if(m.sst!=null)box.append(h('div',{class:'card',text:survivalText(m.sst)}))}
+    catch(e){fcBtn.disabled=false;fc.textContent='Could not load the marine forecast ('+e.message+'). Enter the current by hand.'}}});
+  upd();document.addEventListener('rl-drift',upd);
+  box.append(h('div',{class:'lbl',text:'Drifting object'}),oc,h('div',{class:'lbl',text:'Water current'}),h('div',{style:'display:grid;grid-template-columns:1fr 1fr;gap:8px'},h('label',{class:'note'},'Speed (knots)',cs),h('label',{class:'note'},'Flowing toward (°)',cd)),
+    h('div',{class:'row'},fcBtn,h('button',{class:'btn primary',text:'Search pattern at datum',onclick:()=>openPattern(f)})),fc,info,
+    h('div',{class:'note',text:'Drift uses the wind at the top of the screen and rough leeway factors for the object. It is a planning estimate only. The Coast Guard and marine units use dedicated drift models; share this with them, never instead of calling them.'}));
+  return box}
+function turtle(start,legs){const pts=[start];let p=start;for(const [hd,d] of legs){p=dest(p,(hd%360+360)%360,d);pts.push(p)}return pts}
+let patType='es';
+function openPattern(f){
+  const d=f?driftOf(f):null,center=d?d.datum:[view.lat,view.lon];
+  const uL=units==='nau'?'nm':units==='imp'?'mi':'km',uM=units==='nau'?1852:units==='imp'?1609.344:1000;
+  const sp=h('input',{class:'in',type:'number',step:'0.05',min:'0.01',inputmode:'decimal','aria-label':'Track spacing'}),sz=h('input',{class:'in',type:'number',step:'1',min:'1',inputmode:'numeric','aria-label':'Size'}),hd=h('input',{class:'in',type:'number',step:'1',min:'0',max:'359',inputmode:'numeric','aria-label':'First leg heading'});
+  sp.value=units==='nau'?'0.2':units==='imp'?'0.2':'0.3';sz.value=patType==='ps'?'2':patType==='vs'?'1':'12';hd.value=d&&d.dist>1?String(Math.round(d.brg)):'0';
+  const tr=h('div',{class:'row'}),szL=h('span',{}),out=h('div',{class:'stat'});
+  const T={es:['Expanding square','Number of legs'],vs:['Sector search','Radius ('+uL+')'],ps:['Parallel track','Area width and length ('+uL+')']};
+  const dT=()=>{tr.replaceChildren(...Object.entries(T).map(([k,v])=>h('button',{class:'chip','aria-pressed':String(patType===k),text:v[0],onclick:()=>{patType=k;sz.value=k==='ps'?'2':k==='vs'?'1':'12';dT()}})));szL.textContent=T[patType][1]};dT();
+  const make=()=>{const S=Math.max(.005,+sp.value||0)*uM,H0=+hd.value||0,n=Math.max(1,+sz.value||1);let pts;
+    if(patType==='es'){const legs=[];for(let i=0;i<Math.min(60,n);i++)legs.push([H0+90*i,S*(Math.floor(i/2)+1)]);pts=turtle(center,legs)}
+    else if(patType==='vs'){const R=n*uM,legs=[];let hh=H0;for(let i=0;i<9;i++){legs.push([hh,R]);if(i%3!==2)hh+=120}pts=turtle(center,legs)}
+    else{const Wd=n*uM,Ln=n*uM,k=Math.max(1,Math.min(60,Math.ceil(Wd/S)));let p=dest(dest(center,H0+180,Ln/2),H0-90,Wd/2-S/2);pts=[p];
+      for(let i=0;i<k;i++){p=dest(p,i%2?H0+180:H0,Ln);pts.push(p);if(i<k-1){p=dest(p,H0+90,S);pts.push(p)}}}
+    return pts};
+  const go=async()=>{const pts=make();const c=centroid(pts),f2={...base(),type:'track',kind:'route',name:T[patType][0]+' · '+sp.value+' '+uL+' spacing',note:(f?'From drift datum for '+f.name+'. ':'')+'First leg '+Math.round(+hd.value||0)+'°.',pts,la:c[0],lo:c[1]};
+    closeSheet();await saveFeature(f2);showOnMap(f2);setTimeout(()=>openFeature(f2.id),250);toast('Pattern saved. Export it as GPX from the Menu to load it into a boat plotter.')};
+  openSheet([h('h2',{text:'Search pattern'}),h('div',{class:'stat',text:d?'Centered on the drift datum for '+f.name+'.':'Centered on the cross.'}),tr,
+    h('div',{style:'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px'},h('label',{class:'note'},'Track spacing ('+uL+')',sp),h('label',{class:'note'},szL,sz),h('label',{class:'note'},'First leg (°)',hd)),out,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Create pattern',onclick:go}),h('button',{class:'btn',text:'Close',onclick:closeSheet})),
+    h('div',{class:'note',text:'Expanding square starts at the datum and turns right each leg. Sector search runs three triangles through the datum. Parallel track covers a square area in back-and-forth legs. Track spacing depends on visibility and what you are looking for.'})])}
+
 /* 3D terrain view */
 const V3={on:false,grid:null,yaw:0,pitch:45,zoom:1,ex:1.5,dirty:false,cx:0,cy:0,sc:1,D:1,w:0,h:0};
 const cv3=$('#cv3'),c3=cv3.getContext('2d');
@@ -560,11 +639,11 @@ function open3D(){
   if(ext<1000){toast('Zoom out a little for 3D. The elevation data is too coarse for very small areas.');return}
   if(ext>40000){toast('Zoom in for 3D. It shows areas up to about 25 miles across.');return}
   $('#v3d').hidden=false;V3.on=true;V3.yaw=0;V3.pitch=45;V3.zoom=1;size3();exChips();
-  const tl=fromXY(0,0),br=fromXY(W,H),nx=36,ny=Math.max(12,Math.min(54,Math.round(36*H/W))),key=[tl,br].flat().map(v=>v.toFixed(4)).join(',');
+  const tl=fromXY(0,0),br=fromXY(W,H),nx=28,ny=Math.max(10,Math.min(42,Math.round(28*H/W))),key=[tl,br].flat().map(v=>v.toFixed(4)).join(',');
   if(V3.grid&&V3.grid.key===key){msg3('');req3();return}
   V3.grid=null;msg3('Loading terrain…');$('#v3info').textContent='';req3();
   const pts=[];for(let i=0;i<=ny;i++)for(let j=0;j<=nx;j++)pts.push([tl[0]-(tl[0]-br[0])*i/ny,tl[1]+(br[1]-tl[1])*j/nx]);
-  elevFetch(pts).then(e=>{if(!V3.on)return;if(!e||e.some(v=>v==null)){msg3('Could not load elevation. 3D needs an internet connection.');return}
+  elevFetch(pts).then(e=>{if(!V3.on)return;if(!e||e.some(v=>v==null)){msg3(navigator.onLine===false?'You are offline. 3D needs an internet connection.':'Could not load elevation: '+(lastElevErr||'unknown error')+'. Tap Back, wait a minute and try again.');return}
     let mn=Infinity,mx=-Infinity;for(const v of e){if(v<mn)mn=v;if(v>mx)mx=v}
     const lac=(tl[0]+br[0])/2,loc=(tl[1]+br[1])/2,kx=111320*Math.cos(lac*rad);
     V3.grid={key,la1:tl[0],la0:br[0],lo0:tl[1],lo1:br[1],nx,ny,e,mn,mx,lac,loc,kx,wM:(br[1]-tl[1])*kx,hM:(tl[0]-br[0])*111320};
@@ -612,10 +691,14 @@ function terrainSection(){
   const b=h('button',{class:'chip','aria-pressed':String(slopeOn),text:'Show steepness on the map',onclick:()=>{if(!can('terrain')){upsell('terrain');return}slopeOn=!slopeOn;LS.set('slope',slopeOn);b.setAttribute('aria-pressed',String(slopeOn));if(slopeOn){sGrid=null;toast('Loading steepness for this area…')}redraw()}});
   return [h('div',{class:'lbl',text:'Terrain'}),h('div',{class:'row'},b),h('div',{class:'note',text:'Shades steep ground from yellow (10–20°) to purple (over 40°). Uses elevation data about 90 m across, so it needs an internet connection and misses small cliffs. The cross shows its elevation at the bottom left. Use the Relief map background for shaded hills.'})]}
 function bgSection(){
-  if(SHARED)return [h('div',{class:'lbl',text:'Map background'}),h('div',{class:'note',text:'Satellite and topo maps work in the saved file. This shared page cannot load map images.'})];
-  const row=h('div',{class:'row'});
-  const dr=()=>row.replaceChildren(...[['grid','Grid'],['sat','Satellite'],['hybrid','Hybrid'],['topo','Topo'],['relief','Relief']].map(([k,l])=>h('button',{class:'chip','aria-pressed':String(bg===k),text:l,onclick:()=>{bg=k;LS.set('bg',k);dr();redraw()}})));dr();
-  return [h('div',{class:'lbl',text:'Map background'}),row,h('div',{class:'row'},h('button',{class:'btn',text:'Save this area for offline',onclick:openOffline})),h('div',{class:'note',text:'Satellite and topo cover the US and need a connection unless you save the area first.'})]}
+  if(SHARED)return [h('div',{class:'lbl',text:'Map background'}),h('div',{class:'note',text:'Satellite and topo maps work in the Ridgeline app. This shared page cannot load map images.'})];
+  const w=h('div',{class:'row'}),u=h('div',{class:'row'}),o=h('div',{class:'row'});
+  const chip=(k,l)=>h('button',{class:'chip','aria-pressed':String(bg===k),text:l,onclick:()=>{bg=k;LS.set('bg',k);dr();redraw()}});
+  const dr=()=>{w.replaceChildren(chip('whyb','Hybrid'),chip('wsat','Satellite'),chip('wtopo','Topo'),chip('grid','Grid'));u.replaceChildren(chip('hybrid','USGS hybrid'),chip('topo','USGS topo'),chip('sat','USGS satellite'),chip('relief','Relief'),chip('chart','Nautical chart'));
+    o.replaceChildren(h('button',{class:'chip','aria-pressed':String(seaOn),text:'Sea marks overlay',onclick:()=>{seaOn=!seaOn;LS.set('seamarks',seaOn);dr();redraw()}}))};dr();
+  return [h('div',{class:'lbl',text:'Map background, worldwide'}),w,h('div',{class:'lbl',text:'United States only'}),u,h('div',{class:'lbl',text:'On the water'}),o,
+    h('div',{class:'row'},h('button',{class:'btn',text:'Save this area for offline',onclick:openOffline})),
+    h('div',{class:'note',text:'Worldwide maps cover every country. USGS maps have US topo detail. The nautical chart covers US waters; sea marks (buoys, lights, channels) cover the world. Charts here are for search planning, not navigation.'})]}
 
 /* map canvas */
 const cv=$('#cv'),ctx=cv.getContext('2d');
@@ -623,18 +706,22 @@ function resize(){const r=$('#mapwrap').getBoundingClientRect();if(!r.width)retu
 new ResizeObserver(resize).observe($('#mapwrap'));
 function redraw(){if(!dirty){dirty=true;requestAnimationFrame(draw)}}
 const STEPS_M=[10,25,50,100,250,500,1000,2500,5000,10000,25000,50000,100000];
+const STEPS_N=[.01,.025,.05,.1,.25,.5,1,2,5,10,20,50,100].map(n=>n*1852);
 const STEPS_I=[100,200,500,1000,2640,5280,10560,26400,52800,105600,264000,528000].map(f=>f/3.28084);
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 /* terrain */
-const fmtElev=m=>units==='imp'?Math.round(m*3.28084).toLocaleString()+' ft':Math.round(m)+' m';
+const fmtElev=m=>units!=='met'?Math.round(m*3.28084).toLocaleString()+' ft':Math.round(m)+' m';
 const eCache=new Map(),ek=q=>q[0].toFixed(4)+','+q[1].toFixed(4);
+let lastElevErr='';
+const om=u=>SERVICES.openMeteoKey?u.replace('https://api.','https://customer-api.').replace('https://marine-api.','https://customer-marine-api.')+'&apikey='+encodeURIComponent(SERVICES.openMeteoKey):u;
 async function elevFetch(pts){
   if(SHARED)return null;
   const need=[...new Map(pts.filter(q=>!eCache.has(ek(q))).map(q=>[ek(q),q])).values()];
   try{for(let i=0;i<need.length;i+=100){const c=need.slice(i,i+100);
-    const r=await fetch('https://api.open-meteo.com/v1/elevation?latitude='+c.map(q=>q[0].toFixed(4)).join(',')+'&longitude='+c.map(q=>q[1].toFixed(4)).join(','));
-    if(!r.ok)throw new Error('http');const j=await r.json();if(!Array.isArray(j.elevation)||j.elevation.length!==c.length)throw new Error('shape');
-    c.forEach((q,n)=>eCache.set(ek(q),j.elevation[n]))}}catch(e){return null}
+    const u=om('https://api.open-meteo.com/v1/elevation?latitude='+c.map(q=>q[0].toFixed(4)).join(',')+'&longitude='+c.map(q=>q[1].toFixed(4)).join(','));let r=null;
+    for(let t=0;t<3;t++){try{r=await fetch(u)}catch(e){r=null;lastElevErr='no response from the elevation service'}if(r&&r.ok)break;if(r)lastElevErr='elevation service said '+r.status+(r.status===429?' (too many requests)':'');await new Promise(q=>setTimeout(q,900*(t+1)))}
+    if(!r||!r.ok)throw new Error('http');const j=await r.json();if(!Array.isArray(j.elevation)||j.elevation.length!==c.length){lastElevErr='unexpected answer from the elevation service'+(j&&j.reason?': '+j.reason:'');throw new Error('shape')}
+    c.forEach((q,n)=>{const v=j.elevation[n];eCache.set(ek(q),Number.isFinite(v)?v:0)})}}catch(e){return null}
   return pts.map(q=>eCache.get(ek(q)))}
 const slopeCol=deg=>deg<10?null:deg<20?'#E5C100':deg<30?'#F08A24':deg<40?'#D63A2F':'#8E24AA';
 const smooth=e=>e.map((v,i)=>{const a=e[Math.max(0,i-1)],b=e[Math.min(e.length-1,i+1)];return (a+v*2+b)/4});
@@ -667,7 +754,7 @@ async function slopeLoad(){
     if(e&&!e.some(v=>v==null)){const cw=(lo1-lo0)*Math.cos(view.lat*rad)*111320/SN,ch=(la1-la0)*111320/ny,deg=[];
       for(let i=0;i<ny;i++)for(let j=0;j<SN;j++){const a=e[i*(SN+1)+j],b=e[i*(SN+1)+j+1],c=e[(i+1)*(SN+1)+j],d=e[(i+1)*(SN+1)+j+1],gx=((b+d)-(a+c))/(2*cw),gy=((a+b)-(c+d))/(2*ch);deg.push(Math.atan(Math.hypot(gx,gy))/rad)}
       sGrid={la0,la1,lo0,lo1,mpp:view.mpp,ny,deg}}
-    else toast('Could not load elevation for the steepness layer. It needs an internet connection.')}
+    else toast('Could not load elevation for the steepness layer: '+(lastElevErr||'no connection')+'.')}
   finally{sBusy=false;redraw()}}
 const tCache=new Map();
 function terrainFor(last,bear){
@@ -723,7 +810,7 @@ function draw(){
   dirty=false;if(!W)return;
   const C={bg:css('--map'),grid:css('--grid'),ink:css('--ink'),acc:css('--accent'),good:css('--good'),bad:css('--bad'),crew:css('--crew'),muted:css('--muted')};
   ctx.clearRect(0,0,W,H);ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
-  const steps=units==='imp'?STEPS_I:STEPS_M,step=steps.find(s=>s/view.mpp>=70)||steps[steps.length-1];
+  const steps=units==='imp'?STEPS_I:units==='nau'?STEPS_N:STEPS_M,step=steps.find(s=>s/view.mpp>=70)||steps[steps.length-1];
   const tl=fromXY(0,0),br=fromXY(W,H),dLa=step/111320,dLo=step/mLon();
   const tiles=bg!=='grid'&&!!TILE[bg];calcLatest();
   const txtAt=(t,x,y)=>{ctx.font='600 14px Barlow,system-ui,sans-serif';ctx.textAlign='center';if(tiles){ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText(t,x,y);ctx.fillStyle='#fff'}else ctx.fillStyle=C.ink;ctx.fillText(t,x,y)};
@@ -748,6 +835,10 @@ function draw(){
     ctx.beginPath();ctx.arc(ex,ey,8,0,7);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=g.color;ctx.stroke();
     txtAt(g.who+(g.team?' ('+g.team.l+')':'')+' could be here · '+fmtDist(g.dist),ex,ey-16);
     if(g.terr&&g.terr.steep&&g.terr.steep.d<=g.dist+300){const sp=dest(g.last,g.bear,g.terr.steep.d),[sx,sy]=toXY(sp[0],sp[1]);ctx.beginPath();ctx.arc(sx,sy,7,0,7);ctx.fillStyle='#8E24AA';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();txtAt('Very steep',sx,sy-12)}}
+  for(const f of features.values()){const d=driftOf(f);if(!d||d.dist<1)continue;const [ax,ay]=toXY(f.la,f.lo),[dx,dy]=toXY(d.datum[0],d.datum[1]),[lx,ly]=toXY(d.L[0],d.L[1]),[rx,ry]=toXY(d.R[0],d.R[1]),rr=d.radius/view.mpp;
+    ctx.beginPath();ctx.arc(dx,dy,rr,0,7);ctx.fillStyle='#1E6FD922';ctx.fill();ctx.setLineDash([8,6]);ctx.lineWidth=2.5;ctx.strokeStyle='#1E6FD9';ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(dx,dy);ctx.moveTo(ax,ay);ctx.lineTo(lx,ly);ctx.moveTo(ax,ay);ctx.lineTo(rx,ry);ctx.lineWidth=2;ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(dx,dy,7,0,7);ctx.fillStyle='#1E6FD9';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();txtAt('Drift datum · '+fmtDist(d.dist),dx,dy-14)}
   // scent cones: where a stand's scent travels
   if(wind&&wind.mph>0)for(const f of features.values()){const ok=windOk(f);if(ok===null)continue;const [x,y]=toXY(f.la,f.lo),to=(wind.from+180)%360,L=Math.max(36,(60+wind.mph*12)/view.mpp);
     ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,L,(to-28-90)*rad,(to+28-90)*rad);ctx.closePath();ctx.fillStyle=(ok?C.good:C.bad)+'44';ctx.fill()}
@@ -824,12 +915,14 @@ function openAdd(){
       row('Measure distance','Line distance and bearing',()=>startDraft('measure')),SHARED?null:row(rec?'Stop recording':'Record my track','Keep the screen on',toggleRec)]),
     h('div',{class:'lbl',text:'Navigate and photos'}),
     h('div',{class:'grid2'},[row('Compass','Heading, and the way to any pin',()=>openCompass(null)),photoRow]),
+    h('div',{class:'lbl',text:'On the water'}),
+    h('div',{class:'grid2'},[h('button',{class:'item',style:'border-color:#E11D48',onclick:()=>markHere('mob')},h('span',{},h('div',{style:'font-weight:700;color:#E11D48',text:'Person in water'}),h('div',{class:'m',text:'Marks your GPS spot and the time now'}))),row('Search pattern','Expanding square, sector or parallel',()=>openPattern(null))]),
     h('div',{class:'lbl',text:'Search and rescue'}),
     h('div',{class:'grid2'},[row('Last known point','Where last seen',()=>addPin('lkp')),
       row('Clue','Footprint, item, sighting',()=>addPin('clue')),
       row('Search sector','Draw area, assign team',()=>startDraft('sector')),
       row('Check in','Tell the team where you are',openCheckin)]),
-    h('div',{class:'note',text:SHARED?'Everyone with access sees what you add. For a missing person, call 911 first.':'For a missing person, call 911 first. This app is a planning aid.'}),
+    h('div',{class:'note',text:SHARED?'Everyone with access sees what you add. For a missing person, call your emergency number first (911 in North America, 112 in Europe, 999 in the UK, 000 in Australia).':'For a missing person, call your emergency number first (911 in North America, 112 in Europe, 999 in the UK, 000 in Australia). This app is a planning aid.'}),
     h('div',{class:'row'},h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
 
 /* photos: kept on this device */
@@ -912,7 +1005,7 @@ function openSaved(){
 async function addPin(kind,at,photo){
   if(PLACE_KINDS.includes(kind)&&!can('places')&&[...features.values()].filter(f=>f.type==='pin'&&PLACE_KINDS.includes(f.kind)).length>=MEMBERSHIP.freePlaceLimit){closeSheet();upsell('places');return}
   const n=[...features.values()].filter(f=>f.kind===kind).length+1;
-  const f={...base(),type:'pin',kind,name:kind==='lkp'?'Last known point':KINDS[kind].l+' '+n,la:at?at[0]:view.lat,lo:at?at[1]:view.lon};
+  const f={...base(),type:'pin',kind,name:kind==='lkp'?'Last known point':KINDS[kind].l+' '+n,la:at?at[0]:view.lat,lo:at?at[1]:view.lon,...(kind==='mob'?{seen:Date.now(),drift:{o:'piw',cs:0,cd:0}}:{})};
   closeSheet();await saveFeature(f);if(photo)await addPhoto(f.id,photo);openPin(f)}
 function openCheckin(){
   const here=me?{la:me.la,lo:me.lo}:{la:view.lat,lo:view.lon};
@@ -993,20 +1086,20 @@ function openPin(f){
   const where=me?fmtDist(hav([me.la,me.lo],[f.la,f.lo]))+' '+octOf(bearing([me.la,me.lo],[f.la,f.lo]))+' of you · '+fmtLL(f.la,f.lo):fmtLL(f.la,f.lo);
   const kindRow=h('div',{class:'row'}),windBox=h('div',{}),ringBox=h('div',{});
   const elv=h('div',{class:'stat'});if(!SHARED&&can('terrain'))elevFetch([[f.la,f.lo]]).then(e=>{if(e&&e[0]!=null)elv.textContent='Elevation '+fmtElev(e[0])});
-  const isSign=f.kind==='lkp'||f.kind==='clue',pad=n=>String(n).padStart(2,'0');
+  const isSign=f.kind==='lkp'||f.kind==='clue'||f.kind==='mob',pad=n=>String(n).padStart(2,'0');
   const toLoc=ms=>{const d=new Date(ms);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())};
-  const seenIn=h('input',{type:'datetime-local',class:'in','aria-label':'When this was seen'});seenIn.value=toLoc(f.seen||f.ts||Date.now());
+  const seenIn=h('input',{type:'datetime-local',class:'in','aria-label':'When this was seen'});seenIn.value=toLoc(f.seen||f.ts||Date.now());seenIn.addEventListener('change',()=>{const v=new Date(seenIn.value).getTime();if(v){f.seen=v;if(f.kind==='mob'){saveFeature(f);document.dispatchEvent(new Event('rl-drift'))}}});
   function drawKinds(){if(!editable){kindRow.replaceChildren();return}kindRow.replaceChildren(...PLACE_KINDS.map(k=>h('button',{class:'chip','aria-pressed':String(kind===k),text:KINDS[k].l,onclick:()=>{kind=k;drawKinds();drawWinds()}})))}
   function drawWinds(){
     if(kind!=='stand'){windBox.replaceChildren();return}
     const ok=wind&&winds.has(octOf(wind.from));
     const status=!winds.size?h('div',{class:'stat',text:'Tap the wind directions this stand works in.'}):!wind?h('div',{class:'stat',text:'Set the wind at the top of the map to see if it is right today.'}):h('div',{class:'stat '+(ok?'ok':'no'),text:'Wind from '+octOf(wind.from)+': '+(ok?'good for this stand':'wrong wind for this stand')});
     windBox.replaceChildren(h('div',{class:'lbl',text:'Hunt it when the wind is from'}),h('div',{class:'row'},OCT.map(o=>h('button',{class:'chip','aria-pressed':String(winds.has(o)),text:o,onclick:()=>{winds.has(o)?winds.delete(o):winds.add(o);drawWinds()}}))),status)}
-  if(f.kind==='lkp'){const us=units==='imp'?402.336:250,sl=h('input',{type:'range',min:'0',max:'24',value:String(Math.round(radius/us)),'aria-label':'Search ring'}),lab=h('div',{class:'stat'});
+  if(f.kind==='lkp'){const us=units==='imp'?402.336:units==='nau'?185.2:250,sl=h('input',{type:'range',min:'0',max:'24',value:String(Math.round(radius/us)),'aria-label':'Search ring'}),lab=h('div',{class:'stat'});
     const upd=()=>{radius=+sl.value*us;lab.textContent=radius?'Search ring: '+fmtDist(radius):'No search ring'};sl.addEventListener('input',upd);upd();
     ringBox.append(h('div',{class:'lbl',text:'Search ring around this point'}),sl,lab)}
   drawKinds();drawWinds();
-  openSheet([h('h2',{text:(KINDS[f.kind]||KINDS.waypoint).l}),nm,h('div',{class:'stat',text:where}),elv,f.ts?h('div',{class:'stat',text:metaLine(f)}):null,kindRow,windBox,ringBox,photoBox(f),isSign?h('div',{},h('div',{class:'lbl',text:'When was this seen'}),seenIn,h('div',{class:'note',text:'Two or more signs with times draw a projected route on the map.'})):null,h('div',{class:'lbl',text:'Notes'}),nt,
+  openSheet([h('h2',{text:(KINDS[f.kind]||KINDS.waypoint).l}),nm,h('div',{class:'stat',text:where}),elv,f.ts?h('div',{class:'stat',text:metaLine(f)}):null,kindRow,windBox,ringBox,waterBox(f),photoBox(f),isSign?h('div',{},h('div',{class:'lbl',text:'When was this seen'}),seenIn,h('div',{class:'note',text:'Two or more signs with times draw a projected route on the map.'})):null,h('div',{class:'lbl',text:'Notes'}),nt,
     h('div',{class:'row'},h('button',{class:'btn primary',text:'Save',onclick:async()=>{await saveFeature({...f,name:nm.value.trim()||f.name,note:nt.value.trim(),kind:editable?kind:f.kind,winds:(editable&&kind==='stand')?[...winds]:[],radius,seen:isSign&&seenIn.value?new Date(seenIn.value).getTime()||0:f.seen||0});closeSheet()}}),h('button',{class:'btn',text:'Navigate',onclick:()=>openCompass(f)}),h('button',{class:'btn',text:'QR code',onclick:()=>openPinQR(f)}),delBtn(f),h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
 function openArea(f){
   const nm=h('input',{class:'in',maxlength:'80','aria-label':'Area name'});nm.value=f.name;
@@ -1027,7 +1120,7 @@ function openTrack(f){
   const nm=h('input',{class:'in',maxlength:'80','aria-label':'Name'});nm.value=f.name;
   const nt=h('textarea',{class:'in',rows:'3',maxlength:'500',placeholder:'Notes','aria-label':'Notes'});nt.value=f.note;
   const st=h('div',{class:'stat'}),eb=h('div',{});
-  const upd=()=>{st.textContent=fmtDist(len)+' · about '+fmtDur(elev?len/1.389+elev.gain/600*3600:len/1.34)+' on foot'+(elev?' · climbs '+(units==='imp'?Math.round(elev.gain*3.28084)+' ft':Math.round(elev.gain)+' m')+', drops '+(units==='imp'?Math.round(elev.loss*3.28084)+' ft':Math.round(elev.loss)+' m'):'')};upd();
+  const upd=()=>{st.textContent=fmtDist(len)+(units==='nau'?' · about '+fmtDur(len/2.572)+' at 5 kn, '+fmtDur(len/5.144)+' at 10 kn':' · about '+fmtDur(elev?len/1.389+elev.gain/600*3600:len/1.34)+' on foot')+(elev?' · climbs '+(units==='imp'?Math.round(elev.gain*3.28084)+' ft':Math.round(elev.gain)+' m')+', drops '+(units==='imp'?Math.round(elev.loss*3.28084)+' ft':Math.round(elev.loss)+' m'):'')};upd();
   async function getElev(){
     btn.disabled=true;btn.textContent='Loading…';
     const n=Math.min(100,Math.max(12,Math.round(len/60))),sa=sampleAlong(f.pts,n),e0=await elevFetch(sa.pts);
@@ -1064,7 +1157,7 @@ $('#meBtn').addEventListener('click',()=>{
 const wx={ok:false,busy:false,err:false,la:0,lo:0,at:0,now:0,t:[],s:[],d:[],g:[],c:[],p:[],sun:null};
 const tLbl=t=>new Date(t+'Z').toLocaleString([], {weekday:'short',hour:'numeric',timeZone:'UTC'});
 const hLbl=t=>new Date(t+'Z').toLocaleTimeString([], {hour:'numeric',timeZone:'UTC'});
-const tC2=c=>units==='imp'?Math.round(c*9/5+32)+'°F':Math.round(c)+'°C';
+const tC2=c=>units!=='met'?Math.round(c*9/5+32)+'°F':Math.round(c)+'°C';
 function drawWindBtn(){$('#windBtn').textContent=wind?octOf(wind.from)+' '+mph2(wind.mph)+(wind.label&&wind.label!=='Now'&&wind.label!=='Manual'?' · '+wind.label:''):'Set wind';$('#windBtn').setAttribute('aria-label',wind?'Wind from '+octOf(wind.from)+' '+mph2(wind.mph)+'. Open forecast.':'Set wind')}
 function setWind(w){wind=w;LS.set('wind',wind);drawWindBtn();redraw()}
 function setHour(i,auto){setWind({from:Math.round(wx.d[i])%360,mph:Math.round(wx.s[i]),label:i===wx.now?'Now':tLbl(wx.t[i]),auto:!!auto})}
@@ -1074,7 +1167,7 @@ async function wxFetch(){
   const la=me?me.la:view.lat,lo=me?me.lo:view.lon;
   try{
     const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),12000);
-    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude='+la.toFixed(3)+'&longitude='+lo.toFixed(3)+'&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,precipitation_probability&daily=sunrise,sunset&wind_speed_unit=mph&timezone=auto&forecast_days=3',{signal:ctl.signal});clearTimeout(to);
+    const r=await fetch(om('https://api.open-meteo.com/v1/forecast?latitude='+la.toFixed(3)+'&longitude='+lo.toFixed(3)+'&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,precipitation_probability&daily=sunrise,sunset&wind_speed_unit=mph&timezone=auto&forecast_days=3'),{signal:ctl.signal});clearTimeout(to);
     if(!r.ok)throw new Error('http');
     const j=await r.json(),hr=j.hourly;if(!hr||!hr.time||!hr.wind_speed_10m)throw new Error('shape');
     wx.t=hr.time;wx.s=hr.wind_speed_10m;wx.d=hr.wind_direction_10m;wx.g=hr.wind_gusts_10m;wx.c=hr.temperature_2m;wx.p=hr.precipitation_probability||[];wx.sun=j.daily||null;wx.la=la;wx.lo=lo;
@@ -1150,7 +1243,7 @@ function openMenu(){
   const name=h('input',{class:'in',maxlength:'24','aria-label':'Your name'});name.value=callsign();name.addEventListener('change',()=>LS.set('callsign',name.value.trim()||callsign()));
   const go=h('input',{class:'in',placeholder:'45.1234, -90.5678','aria-label':'Coordinates'});
   const units_=h('div',{class:'row'});
-  const drawU=()=>units_.replaceChildren(h('button',{class:'chip','aria-pressed':String(units==='imp'),text:'Feet and miles',onclick:()=>{units='imp';LS.set('units',units);drawU();drawWindBtn();redraw()}}),h('button',{class:'chip','aria-pressed':String(units==='met'),text:'Metres and km',onclick:()=>{units='met';LS.set('units',units);drawU();drawWindBtn();redraw()}}));drawU();
+  const drawU=()=>units_.replaceChildren(h('button',{class:'chip','aria-pressed':String(units==='imp'),text:'Feet and miles',onclick:()=>{units='imp';LS.set('units',units);drawU();drawWindBtn();redraw()}}),h('button',{class:'chip','aria-pressed':String(units==='met'),text:'Metres and km',onclick:()=>{units='met';LS.set('units',units);drawU();drawWindBtn();redraw()}}),h('button',{class:'chip','aria-pressed':String(units==='nau'),text:'Nautical miles and knots',onclick:()=>{units='nau';LS.set('units',units);drawU();drawWindBtn();redraw()}}));drawU();
   const file=h('input',{type:'file',accept:'.json,.geojson,.gpx,application/json,application/gpx+xml,text/xml',style:'display:none'});file.addEventListener('change',()=>{if(file.files[0])importFile(file.files[0]);file.value=''});
   openSheet([h('h2',{text:'Menu'}),
     ...membershipSection(),
