@@ -73,6 +73,11 @@ label.item{cursor:pointer}
 #bar{position:absolute;left:12px;right:80px;bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
 #hint{position:absolute;left:16px;right:16px;top:14px;padding:10px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font-size:16px;pointer-events:none}
 #hint[hidden]{display:none}
+#unit{position:absolute;top:12px;left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);font-size:13px;font-weight:600;background:var(--panel);border:1px solid var(--line);padding:3px 10px;border-radius:14px;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:1}
+#align{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:4}
+#alignImg{position:absolute;left:5%;top:5%;width:90%;height:90%;object-fit:contain;opacity:.55}
+#alignBar{position:absolute;left:12px;right:12px;bottom:12px;pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+#alignBar .row{margin:2px 0}#alignBar input[type=range]{min-height:30px}
 #v3dBtn{right:12px;bottom:178px;font-size:15px}
 #v3d{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;background:var(--map)}
 #cv3{width:100%;height:100%;display:block;touch-action:none}
@@ -146,6 +151,8 @@ button,input,textarea{touch-action:manipulation}
     <section id="map" class="tab on" aria-label="Map">
       <div id="mapwrap"><canvas id="cv" aria-label="Map. Drag to move, pinch to zoom."></canvas></div>
       <div id="tilemsg" hidden><span id="tilemsgT"></span><button class="btn" id="tilemsgX" aria-label="Hide this message">OK</button></div>
+      <div id="unit" hidden></div>
+      <div id="align" hidden><img id="alignImg" alt=""><div id="alignBar"></div></div>
       <div id="hint" hidden>Drag the map until the cross is on the spot, then tap Tools.</div>
       <div id="scale"></div>
       <div id="elev" hidden></div>
@@ -345,6 +352,7 @@ const TILE={
   wtopo:{n:'Topo',f:(z,x,y)=>ESRI+'World_Topo_Map/MapServer/tile/'+z+'/'+y+'/'+x+ek_(),max:18,kb:25,a:'Topo: Esri and contributors'},
   wlab:{n:'Labels',f:(z,x,y)=>ESRI+'Reference/World_Boundaries_and_Places/MapServer/tile/'+z+'/'+y+'/'+x+ek_(),max:18,kb:10,a:'',overlay:true},
   chart:{n:'Nautical chart (US)',f:(z,x,y)=>'https://gis.charttools.noaa.gov/arcgis/rest/services/MCS/NOAAChartDisplay/MapServer/exts/MaritimeChartService/MapServer/export?bbox='+mercBox(z,x,y).join(',')+'&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=false&f=image',max:17,kb:30,a:'Charts: NOAA Office of Coast Survey. Not for navigation.'},
+  sma:{n:'Public land',f:(z,x,y)=>'https://gis.blm.gov/arcgis/rest/services/lands/BLM_Natl_SMA_Cached_without_PriUnk/MapServer/tile/'+z+'/'+y+'/'+x,max:17,kb:12,a:'',overlay:true,alpha:.5},
   seamark:{n:'Sea marks',f:(z,x,y)=>'https://tiles.openseamap.org/seamark/'+z+'/'+x+'/'+y+'.png',max:18,kb:8,a:'',overlay:true},
   sat:{n:'Satellite',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/',max:16,kb:30,a:'Imagery: USGS National Map'},
   hybrid:{n:'Hybrid',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/',max:16,kb:35,a:'Imagery and topo: USGS National Map'},
@@ -352,9 +360,9 @@ const TILE={
   topo:{n:'Topo',u:'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/',max:16,kb:25,a:'Topo: USGS National Map'}};
 const BASES=['grid','whyb','wsat','wtopo','hybrid','sat','topo','relief','chart'];
 let bg=SHARED?'grid':LS.get('bg','whyb');if(!SHARED&&!BASES.includes(bg))bg='whyb';
-let seaOn=!SHARED&&!!LS.get('seamarks',false);
+let seaOn=!SHARED&&!!LS.get('seamarks',false),smaOn=!SHARED&&!!LS.get('sma',false);
 const tileUrl=(l,z,x,y)=>{const t=TILE[l];return t.f?t.f(z,x,y):t.u+z+'/'+y+'/'+x};
-const layersOf=b=>[b,...(TILE[b]&&TILE[b].ov?[TILE[b].ov]:[]),...(seaOn?['seamark']:[])].filter(l=>TILE[l]);
+const layersOf=b=>[b,...(smaOn&&can('bounds')?['sma']:[]),...(TILE[b]&&TILE[b].ov?[TILE[b].ov]:[]),...(seaOn?['seamark']:[])].filter(l=>TILE[l]);
 const tx=(lon,z)=>(lon+180)/360*2**z;
 const ty=(lat,z)=>{const s=Math.sin(lat*rad);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*2**z};
 const tlon=(x,z)=>x/2**z*360-180;
@@ -390,7 +398,7 @@ function drawTiles(){
       if(y<0||y>=n)continue;
       const im=getTile(l,z,((x%n)+n)%n,y);if(!im)continue;
       const a=toXY(tlat(y,z),tlon(x,z)),b=toXY(tlat(y+1,z),tlon(x+1,z));
-      ctx.drawImage(im,a[0],a[1],b[0]-a[0]+0.5,b[1]-a[1]+0.5)}}}
+      ctx.globalAlpha=TILE[l].alpha||1;ctx.drawImage(im,a[0],a[1],b[0]-a[0]+0.5,b[1]-a[1]+0.5);ctx.globalAlpha=1}}}
 function planTiles(){
   const tl=fromXY(-W*.25,-H*.25),br=fromXY(W*1.25,H*1.25),z0=Math.max(2,zFor()-1);let zmax=Math.min(TILE[bg].max,z0+3),list;
   for(;;){list=[];
@@ -452,8 +460,8 @@ function openPinQR(f){
     h('div',{class:'row'},h('button',{class:'btn primary',text:'Save QR image',onclick:()=>saveQr(cv,(f.name||'spot').replace(/[^\w-]+/g,'-').slice(0,40)+'-qr.png')}),h('button',{class:'btn',text:'Back',onclick:()=>openFeature(f.id)}))])}
 /* membership */
 const RANK={free:0,basic:1,pro:2};
-const NEED={area:'basic',places:'basic',route:'basic',track:'basic',customTeam:'basic',qr:'basic',files:'basic',d3:'pro',offline:'pro',terrain:'pro',proj:'pro'};
-const FEAT={area:'Area shapes',places:'More than '+MEMBERSHIP.freePlaceLimit+' places',route:'Planning routes',track:'Recording your track',customTeam:'Custom team icons',qr:'QR code sharing',files:'GPX and GeoJSON import and export',d3:'3D terrain view',offline:'Offline maps',terrain:'Elevation, steepness and route profiles',proj:'Projected routes'};
+const NEED={bounds:'basic',area:'basic',places:'basic',route:'basic',track:'basic',customTeam:'basic',qr:'basic',files:'basic',d3:'pro',offline:'pro',terrain:'pro',proj:'pro'};
+const FEAT={bounds:'Hunting unit boundaries, public land and your own maps',area:'Area shapes',places:'More than '+MEMBERSHIP.freePlaceLimit+' places',route:'Planning routes',track:'Recording your track',customTeam:'Custom team icons',qr:'QR code sharing',files:'GPX and GeoJSON import and export',d3:'3D terrain view',offline:'Offline maps',terrain:'Elevation, steepness and route profiles',proj:'Projected routes'};
 const DAY=864e5;
 function lic(){const l=LS.get('lic',null);return l&&typeof l==='object'&&RANK[l.plan]?l:null}
 function plan(){const l=lic();if(!l)return 'free';if(l.exp&&Date.now()>l.exp)return 'free';if(Date.now()-(l.checked||0)>MEMBERSHIP.offlineGraceDays*DAY)return 'free';return l.plan}
@@ -493,7 +501,7 @@ function openPlans(){
   const cur=plan(),P=MEMBERSHIP.prices,ready=!!MEMBERSHIP.provider;
   const per=h('div',{class:'row'},...[['month','Monthly'],['year','Yearly · save 33%']].map(([k,l])=>h('button',{class:'chip','aria-pressed':String(planPeriod===k),text:l,onclick:()=>{planPeriod=k;openPlans()}})));
   const LIST={free:['Satellite, hybrid, topo and relief maps','GPS, wind and weather','Up to '+MEMBERSHIP.freePlaceLimit+' places like stands and camps','Search and rescue: check-ins, last known point, clues, sectors, teams'],
-    basic:['Everything in Free','Unlimited places','Plan routes, record tracks and draw hunting areas','Custom team icons and QR code sharing','GPX and GeoJSON import and export'],
+    basic:['Everything in Free','Unlimited places','Plan routes, record tracks and draw hunting areas','Hunting unit boundaries, public land and your own map overlays','Custom team icons and QR code sharing','GPX and GeoJSON import and export'],
     pro:['Everything in Basic','Offline maps','3D terrain view','Elevation, steepness and route profiles','Projected routes for searches']};
   const card=p=>{const link=p==='free'?'':MEMBERSHIP.checkout[p+'_'+planPeriod];
     const act=p===cur?h('div',{class:'ok',text:'Your plan'}):p==='free'?null:link?h('a',{class:'btn primary',href:link,target:'_blank',rel:'noopener',text:'Get '+planName(p)}):h('button',{class:'btn',disabled:'',text:'Coming soon'});
@@ -623,6 +631,129 @@ function openPattern(f){
     h('div',{style:'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px'},h('label',{class:'note'},'Track spacing ('+uL+')',sp),h('label',{class:'note'},szL,sz),h('label',{class:'note'},'First leg (°)',hd)),out,
     h('div',{class:'row'},h('button',{class:'btn primary',text:'Create pattern',onclick:go}),h('button',{class:'btn',text:'Close',onclick:closeSheet})),
     h('div',{class:'note',text:'Expanding square starts at the datum and turns right each leg. Sector search runs three triangles through the datum. Parallel track covers a square area in back-and-forth legs. Track spacing depends on visibility and what you are looking for.'})])}
+
+/* boundaries and your own maps */
+let bdbP=null;
+function bdb(){if(!bdbP)bdbP=new Promise((res,rej)=>{try{const q=indexedDB.open('ridgeline-bounds',1);q.onupgradeneeded=()=>{const d=q.result;if(!d.objectStoreNames.contains('b'))d.createObjectStore('b');if(!d.objectStoreNames.contains('img'))d.createObjectStore('img')};q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}catch(e){rej(e)}});return bdbP}
+const bdbTx=(store,mode,fn)=>bdb().then(db=>new Promise((res,rej)=>{const t=db.transaction(store,mode),o=fn(t.objectStore(store));t.oncomplete=()=>res(o&&o.result);t.onerror=()=>rej(t.error)}));
+const bget=(st,k)=>bdbTx(st,'readonly',x=>x.get(k)).catch(()=>null),bput=(st,k,v)=>bdbTx(st,'readwrite',x=>x.put(v,k)).catch(()=>{}),bdel=(st,k)=>bdbTx(st,'readwrite',x=>x.delete(k)).catch(()=>{});
+const SYS=/^(OBJECTID.*|FID|GlobalID|Shape.*|SHAPE.*|created_.*|last_edited_.*|st_area.*|st_length.*)$/i;
+function pickLab(a){for(const k of Object.keys(a||{}))if(/^(NAME|DISTRICT|HD|HUNTDIST|HUNT_DIST|UNIT|UNIT_NAME|LABEL|GMU|GMUID|ID)$/i.test(k)&&a[k]!=null&&a[k]!=='')return String(a[k]);
+  for(const [k,v] of Object.entries(a||{}))if(!SYS.test(k)&&v!=null&&v!==''&&(typeof v==='string'||typeof v==='number'))return String(v);return ''}
+const BCAT=[
+  {k:'wa',n:'Washington game management units',src:'Washington Department of Fish and Wildlife',url:'https://geodataservices.wdfw.wa.gov/arcgis/rest/services/MapServices/LocatorsWM/MapServer/5',lab:a=>'GMU '+(a.GMU_Num!=null?a.GMU_Num:'')+(a.GMU_Name?' '+a.GMU_Name:'')},
+  {k:'or',n:'Oregon wildlife management units',src:'Oregon Department of Fish and Wildlife',url:'https://nrimp.dfw.state.or.us/arcgis/rest/services/ODFW_Admin/WildlifeManagementUnits/MapServer/0',lab:a=>(a.UNIT_NAME||'Unit')+(a.UNIT_NUM!=null?' ('+a.UNIT_NUM+')':'')},
+  {k:'id',n:'Idaho game management units',src:'Idaho Fish and Game',url:'https://services.arcgis.com/FjJI5xHF2dUPVrgK/ArcGIS/rest/services/GameManagementUnits/FeatureServer/0',lab:a=>'GMU '+(a.NAME!=null?a.NAME:a.ID!=null?a.ID:'')},
+  {k:'co',n:'Colorado big game units',src:'Colorado Parks and Wildlife',url:'https://services5.arcgis.com/ttNGmDvKQA7oeDQ3/ArcGIS/rest/services/CPWAdminData/FeatureServer/6',lab:a=>'GMU '+(a.GMUID!=null?a.GMUID:'')},
+  {k:'mt',n:'Montana deer, elk and lion districts',src:'Montana Fish, Wildlife and Parks',url:'https://fwp-gis.mt.gov/arcgis/rest/services/admbnd/huntingDistricts/MapServer/11',lab:a=>'District '+pickLab(a)}];
+const BCOL=['#FFD400','#FF4FD8','#00E5FF','#A3FF12','#FF8A00','#FFFFFF','#FF5A5A','#9B8CFF'];
+let bOn=new Set(LS.get('bounds',[]));const bData=new Map();let bTimer=null;
+const bCustom=()=>LS.get('customBounds',[]),bFiles=()=>LS.get('fileBounds',[]);
+const bDefs=()=>[...BCAT,...bCustom().map(c=>({...c,src:'Your boundary service',lab:pickLab})),...bFiles().map(f=>({...f,file:true,src:'Your boundary file',lab:pickLab}))];
+const bOnDefs=()=>can('bounds')&&!SHARED?bDefs().filter(d=>bOn.has(d.k)):[];
+const bColor=k=>BCOL[Math.max(0,bDefs().findIndex(d=>d.k===k))%BCOL.length];
+const bD=k=>{if(!bData.has(k))bData.set(k,{feats:new Map(),bbox:null,tol:0,busy:false,err:'',loaded:false,warned:false});return bData.get(k)};
+function featOf(id,rings,line,attrs,def){let a=180,b=90,c=-180,d=-90;for(const r_ of rings)for(const q of r_){if(q[0]<a)a=q[0];if(q[0]>c)c=q[0];if(q[1]<b)b=q[1];if(q[1]>d)d=q[1]}
+  let lab='';try{lab=def.lab(attrs||{})}catch(e){lab=pickLab(attrs)}return {id,rings,line,attrs:attrs||{},lab:String(lab||'').trim().slice(0,60),bb:[a,b,c,d]}}
+function bEnsure(def){const d=bD(def.k);if(d.loaded)return;d.loaded=true;bget('b',def.k).then(v=>{if(v&&Array.isArray(v.feats)){for(const f of v.feats)if(!d.feats.has(f.id))d.feats.set(f.id,f);redraw()}})}
+function viewBox(){const tl=fromXY(0,0),br=fromXY(W,H);return [tl[1],br[0],br[1],tl[0]]}
+function bNeed(def,d){if(def.file||d.busy||!W)return false;const v=viewBox(),tol=view.mpp*1.2/111320;if(W*view.mpp>1500000)return false;
+  if(!d.bbox)return true;const cov=d.bbox[0]<=v[0]&&d.bbox[1]<=v[1]&&d.bbox[2]>=v[2]&&d.bbox[3]>=v[3];return !cov||d.tol>tol*2.5}
+async function bFetch(def){const d=bD(def.k);d.busy=true;const v=viewBox(),mx=(v[2]-v[0])*.5,my=(v[3]-v[1])*.5,eb=[v[0]-mx,v[1]-my,v[2]+mx,v[3]+my],tol=view.mpp*1.2/111320;
+  const q=def.url+'/query?where=1%3D1&geometry='+eb.map(x=>x.toFixed(5)).join(',')+'&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&geometryPrecision=5&maxAllowableOffset='+tol.toExponential(3)+'&f=json';
+  try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),20000),r=await fetch(q,{signal:ctl.signal});clearTimeout(to);if(!r.ok)throw new Error('service said '+r.status);const j=await r.json();if(j.error)throw new Error(j.error.message||'service error');
+    const oid=j.objectIdFieldName||((j.fields||[]).find(f=>f.type==='esriFieldTypeOID')||{}).name||'OBJECTID';
+    for(const ft of j.features||[]){const g=ft.geometry||{},rings=g.rings||g.paths;if(!rings||!rings.length)continue;const a=ft.attributes||{},id=String(a[oid]!=null?a[oid]:JSON.stringify(a).slice(0,80));d.feats.set(id,featOf(id,rings,!g.rings,a,def))}
+    d.bbox=eb;d.tol=tol;d.err='';bput('b',def.k,{feats:[...d.feats.values()].slice(-4000)})}
+  catch(e){d.err=e.name==='AbortError'?'timed out':e.message;d.bbox=eb;d.tol=tol;if(!d.warned){d.warned=true;toast('Could not load '+def.n+' ('+d.err+'). Saved boundaries still show.')}}
+  finally{d.busy=false;redraw()}}
+function bSched(){clearTimeout(bTimer);bTimer=setTimeout(()=>{for(const def of bOnDefs()){bEnsure(def);const d=bD(def.k);if(bNeed(def,d))bFetch(def)}},600)}
+function inRings(lo,la,rings){let c=false;for(const r_ of rings)for(let i=0,j=r_.length-1;i<r_.length;j=i++){const a=r_[i],b=r_[j];if((a[1]>la)!==(b[1]>la)&&lo<(b[0]-a[0])*(la-a[1])/(b[1]-a[1])+a[0])c=!c}return c}
+function unitsAt(la,lo){const out=[];for(const def of bOnDefs()){const d=bData.get(def.k);if(!d)continue;for(const f of d.feats.values()){if(f.line||lo<f.bb[0]||lo>f.bb[2]||la<f.bb[1]||la>f.bb[3])continue;if(inRings(lo,la,f.rings)){out.push({def,f});break}}}return out}
+function drawBounds(txtAt){
+  const v=viewBox(),defs=bOnDefs();if(!defs.length)return;ctx.lineJoin='round';
+  for(const def of defs){const d=bData.get(def.k);if(!d)continue;const col=bColor(def.k),labs=[];let n=0;
+    for(const f of d.feats.values()){if(f.bb[2]<v[0]||f.bb[0]>v[2]||f.bb[3]<v[1]||f.bb[1]>v[3])continue;if(++n>1500)break;
+      ctx.beginPath();for(const r_ of f.rings){r_.forEach((q,i)=>{const [x,y]=toXY(q[1],q[0]);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});if(!f.line)ctx.closePath()}
+      ctx.lineWidth=5;ctx.strokeStyle='rgba(0,0,0,.5)';ctx.stroke();ctx.lineWidth=2.2;ctx.strokeStyle=col;ctx.stroke();
+      if(!f.line&&f.lab){const [x0,y0]=toXY(f.bb[3],f.bb[0]),[x1,y1]=toXY(f.bb[1],f.bb[2]);if(x1-x0>90&&y1-y0>50){const r0=f.rings[0];let sx=0,sy=0;for(const q of r0){sx+=q[0];sy+=q[1]}const [cx,cy]=toXY(sy/r0.length,sx/r0.length);labs.push([f.lab,Math.max(70,Math.min(W-90,cx)),Math.max(70,Math.min(H-170,cy))])}}}
+    for(const l of labs)txtAt(l[0],l[1],l[2])}}
+function updUnit(){const el=$('#unit'),defs=bOnDefs();if(!defs.length){el.hidden=true;return false}const u=unitsAt(view.lat,view.lon);el.textContent=u.map(x=>x.f.lab||x.def.n).join(' · ');el.hidden=!u.length;return !!u.length}
+function openUnit(list){
+  const rows=f=>Object.entries(f.attrs).filter(([k,v])=>!SYS.test(k)&&v!=null&&v!==''&&!(typeof v==='number'&&v>1e11&&/date|time/i.test(k))).slice(0,16).map(([k,v])=>typeof v==='string'&&/^https?:\/\//.test(v)?h('div',{class:'stat'},k.replace(/_/g,' ')+': ',h('a',{href:v,target:'_blank',rel:'noopener',text:'open link'})):h('div',{class:'stat',text:k.replace(/_/g,' ')+': '+v}));
+  openSheet([...list.flatMap(({def,f})=>[h('h2',{text:f.lab||def.n}),h('div',{class:'note',text:def.n+' · '+def.src}),h('details',{},h('summary',{text:'Details from the agency'}),...rows(f))]),
+    h('div',{class:'note',text:'Boundaries come from the agency and can change each season. Always check the official hunting regulations before you hunt.'}),
+    h('div',{class:'row'},h('button',{class:'btn',text:'Close',onclick:closeSheet}))])}
+function parseBoundaryFile(name,text){
+  const feats=[];let i=0;const add=(rings,line,props)=>{if(rings.length&&rings[0].length>1)feats.push(featOf('f'+(i++),rings,line,props||{},{lab:pickLab}))};
+  const nameOf=p=>({name:p&&(p.name||p.Name||p.NAME||p.title||p.UNIT||p.unit)||'',...p});
+  if(/\.(geo)?json$/i.test(name)||/^\s*[{\[]/.test(text)){const j=JSON.parse(text);const fs=j.type==='FeatureCollection'?j.features:j.type==='Feature'?[j]:[{type:'Feature',geometry:j,properties:{}}];
+    for(const f of fs){const g=f&&f.geometry;if(!g)continue;const pr=nameOf(f.properties||{});
+      if(g.type==='Polygon')add(g.coordinates,false,pr);else if(g.type==='MultiPolygon')g.coordinates.forEach(c=>add(c,false,pr));else if(g.type==='LineString')add([g.coordinates],true,pr);else if(g.type==='MultiLineString')add(g.coordinates,true,pr)}}
+  else{const x=new DOMParser().parseFromString(text,'text/xml'),co=t=>t.trim().split(/\s+/).map(c=>c.split(',').map(Number)).filter(c=>isFinite(c[0])&&isFinite(c[1])).map(c=>[c[0],c[1]]);
+    for(const pm of x.getElementsByTagName('Placemark')){const nm=(pm.getElementsByTagName('name')[0]||{}).textContent||'';
+      for(const pg of pm.getElementsByTagName('Polygon'))add([...pg.getElementsByTagName('coordinates')].map(c=>co(c.textContent)),false,{name:nm});
+      for(const ls of pm.getElementsByTagName('LineString'))add([co((ls.getElementsByTagName('coordinates')[0]||{}).textContent||'')],true,{name:nm})}
+    for(const tk of x.getElementsByTagName('trk')){const nm=(tk.getElementsByTagName('name')[0]||{}).textContent||'';for(const sg of tk.getElementsByTagName('trkseg'))add([[...sg.getElementsByTagName('trkpt')].map(p=>[+p.getAttribute('lon'),+p.getAttribute('lat')])],true,{name:nm})}}
+  return feats.slice(0,5000)}
+function boundsSection(){
+  if(SHARED)return [h('div',{class:'lbl',text:'Boundaries and your maps'}),h('div',{class:'note',text:'Hunting units, public land and your own maps work in the Ridgeline app.'})];
+  const g=fn=>()=>{if(!can('bounds')){upsell('bounds');return}fn()};
+  const st=h('div',{class:'row'}),cu=h('div',{});
+  const tog=k=>g(()=>{bOn.has(k)?bOn.delete(k):bOn.add(k);LS.set('bounds',[...bOn]);dr();redraw()});
+  const dr=()=>{st.replaceChildren(h('button',{class:'chip','aria-pressed':String(smaOn),text:'Public land (US)',onclick:g(()=>{smaOn=!smaOn;LS.set('sma',smaOn);dr();redraw()})}),...BCAT.map(d=>h('button',{class:'chip','aria-pressed':String(bOn.has(d.k)),onclick:tog(d.k)},h('span',{style:'color:'+bColor(d.k)+';text-shadow:0 0 2px #000',text:'■ '}),d.n.replace(' game management units',' GMUs').replace(' wildlife management units',' units'))));
+    const mine=[...bCustom(),...bFiles()];cu.replaceChildren(...mine.map(d=>h('div',{class:'row',style:'align-items:center'},h('button',{class:'chip','aria-pressed':String(bOn.has(d.k)),onclick:tog(d.k)},h('span',{style:'color:'+bColor(d.k)+';text-shadow:0 0 2px #000',text:'■ '}),d.n),
+      h('button',{class:'btn',text:'Remove',onclick:()=>{LS.set('customBounds',bCustom().filter(x=>x.k!==d.k));LS.set('fileBounds',bFiles().filter(x=>x.k!==d.k));bOn.delete(d.k);LS.set('bounds',[...bOn]);bData.delete(d.k);bdel('b',d.k);dr();redraw()}}))))};dr();
+  const bf=h('input',{type:'file',accept:'.geojson,.json,.kml,.gpx,application/geo+json,application/vnd.google-earth.kml+xml',style:'display:none'});
+  bf.addEventListener('change',async()=>{const fl=bf.files&&bf.files[0];bf.value='';if(!fl)return;try{const feats=parseBoundaryFile(fl.name,await fl.text());if(!feats.length){toast('No boundaries found in that file.');return}
+    const k='f'+Date.now().toString(36);await bput('b',k,{feats});LS.set('fileBounds',[...bFiles(),{k,n:fl.name.replace(/\.[^.]+$/,'').slice(0,40)}]);bOn.add(k);LS.set('bounds',[...bOn]);const d=bD(k);d.loaded=true;feats.forEach(f=>d.feats.set(f.id,f));dr();redraw();toast('Added '+feats.length+' boundar'+(feats.length===1?'y':'ies')+'.')}
+    catch(e){toast('Could not read that file. Use GeoJSON, KML or GPX.')}});
+  return [h('div',{class:'lbl',text:'Boundaries and your maps'}),st,
+    smaOn?h('div',{class:'note',text:'Public land colors: yellow BLM, green Forest Service, purple national parks, blue state land, pink military, orange tribal land. Private land is not colored.'}):null,cu,
+    h('div',{class:'row'},h('button',{class:'btn',text:'Your map images',onclick:g(openMaps)}),h('label',{class:'btn',style:'display:inline-flex;align-items:center;cursor:pointer',onclick:e=>{if(!can('bounds')){e.preventDefault();upsell('bounds')}}},bf,'Import boundary file'),h('button',{class:'btn',text:'Add a boundary service',onclick:g(openAddService)})),
+    h('div',{class:'note',text:'Hunting units load for the area on screen and are kept on this phone for offline use. The unit under the cross shows at the top; tap inside a unit for details. Other states: import a GeoJSON or KML file from the state wildlife agency, or add its map service.'})]}
+function openAddService(){
+  const nm=h('input',{class:'in',maxlength:'50',placeholder:'Name, like Utah hunt units','aria-label':'Name'}),u=h('input',{class:'in',type:'url',placeholder:'https://…/MapServer/3 or …/FeatureServer/0','aria-label':'Service address'}),out=h('div',{class:'stat'});
+  openSheet([h('h2',{text:'Add a boundary service'}),h('div',{class:'stat',text:'Many state wildlife agencies publish their hunting units as an ArcGIS map service. Paste the address of the layer, ending in /MapServer/ and a number or /FeatureServer/ and a number.'}),nm,h('div',{style:'height:6px'}),u,out,
+    h('div',{class:'row'},h('button',{class:'btn primary',text:'Add',onclick:()=>{let v=u.value.trim().replace(/[?#].*$/,'').replace(/\/(query|info).*$/i,'').replace(/\/+$/,'');
+      if(!/^https:\/\/.+\/(MapServer|FeatureServer)\/\d+$/i.test(v)){out.textContent='That address should start with https:// and end with /MapServer/ or /FeatureServer/ followed by a layer number.';return}
+      const k='c'+Date.now().toString(36);LS.set('customBounds',[...bCustom(),{k,n:(nm.value.trim()||'My boundaries').slice(0,50),url:v}]);bOn.add(k);LS.set('bounds',[...bOn]);closeSheet();redraw();toast('Added. Boundaries load for the area on screen.')}}),h('button',{class:'btn',text:'Cancel',onclick:closeSheet}))])}
+/* your own map images */
+const mapsMeta=()=>LS.get('mapimgs',[]),setMaps=m=>LS.set('mapimgs',m);const imgEls=new Map();let aligning=null;
+function mapImg(k){if(imgEls.has(k))return imgEls.get(k);imgEls.set(k,null);bget('img',k).then(b=>{if(!b)return;const i=new Image();i.onload=()=>{imgEls.set(k,i);redraw()};i.src=URL.createObjectURL(b)});return null}
+function drawUserMaps(){if(!can('bounds')||SHARED)return;for(const m of mapsMeta()){if(!m.on||!m.b||(aligning&&aligning.k===m.k))continue;const im=mapImg(m.k);if(!im)continue;
+  const [x0,y0]=toXY(m.b[0],m.b[1]),[x1,y1]=toXY(m.b[2],m.b[3]),w=x1-x0,hh=y1-y0;if(x1<-W||x0>2*W||y1<-H||y0>2*H)continue;
+  ctx.save();ctx.translate(x0+w/2,y0+hh/2);ctx.rotate((m.rot||0)*rad);ctx.globalAlpha=m.op==null?.7:m.op;ctx.drawImage(im,-w/2,-hh/2,w,hh);ctx.restore()}}
+async function shrinkMap(file){const url=URL.createObjectURL(file);try{const im=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});const k=Math.min(1,4096/Math.max(im.naturalWidth,im.naturalHeight));if(k===1)return file;
+  const cv=document.createElement('canvas');cv.width=Math.round(im.naturalWidth*k);cv.height=Math.round(im.naturalHeight*k);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);return await new Promise(res=>cv.toBlob(b=>res(b||file),/png/i.test(file.type)?'image/png':'image/jpeg',.9))}finally{URL.revokeObjectURL(url)}}
+function openMaps(){
+  const list=h('div',{}),up=h('input',{type:'file',accept:'image/*',style:'display:none'});
+  up.addEventListener('change',async()=>{const fl=up.files&&up.files[0];up.value='';if(!fl)return;if(!/^image\//.test(fl.type)){toast('Choose an image file. For a PDF map, take a screenshot first.');return}
+    toast('Preparing your map…');const b=await shrinkMap(fl),k='m'+Date.now().toString(36);await bput('img',k,b);setMaps([...mapsMeta(),{k,n:fl.name.replace(/\.[^.]+$/,'').slice(0,40)||'My map',op:.7,rot:0,on:true,b:null}]);closeSheet();startAlign(k)});
+  const draw_=()=>list.replaceChildren(...(mapsMeta().length?mapsMeta().map(m=>{const op=h('input',{type:'range',min:'15',max:'100',value:String(Math.round((m.op==null?.7:m.op)*100)),'aria-label':'See-through amount for '+m.n});
+    op.addEventListener('input',()=>{setMaps(mapsMeta().map(x=>x.k===m.k?{...x,op:+op.value/100}:x));redraw()});let armed=false;
+    const del=h('button',{class:'btn danger',text:'Delete',onclick:()=>{if(!armed){armed=true;del.textContent='Tap again';return}setMaps(mapsMeta().filter(x=>x.k!==m.k));bdel('img',m.k);imgEls.delete(m.k);draw_();redraw()}});
+    return h('div',{class:'card'},h('div',{style:'font-weight:600',text:m.n+(m.b?'':' (not lined up yet)')}),h('div',{class:'note',text:'Opacity'}),op,
+      h('div',{class:'row'},h('button',{class:'chip','aria-pressed':String(!!m.on),text:m.on?'Showing':'Hidden',onclick:()=>{setMaps(mapsMeta().map(x=>x.k===m.k?{...x,on:!x.on}:x));draw_();redraw()}}),
+        h('button',{class:'btn',text:m.b?'Go to it':'Line it up',onclick:()=>{if(!m.b){closeSheet();startAlign(m.k);return}view.lat=(m.b[0]+m.b[2])/2;view.lon=(m.b[1]+m.b[3])/2;closeSheet();redraw()}}),m.b?h('button',{class:'btn',text:'Adjust',onclick:()=>{closeSheet();startAlign(m.k)}}):null,del))}):[h('div',{class:'card',text:'No maps yet. Upload a photo or image of a map: a property map, a paper unit map, a trail map or a hand-drawn sketch.'})]));
+  draw_();
+  openSheet([h('h2',{text:'Your map images'}),list,h('div',{class:'row'},h('label',{class:'btn primary',style:'display:inline-flex;align-items:center;cursor:pointer'},up,'Upload a map image'),h('button',{class:'btn',text:'Close',onclick:closeSheet})),
+    h('div',{class:'note',text:'After uploading, move and zoom the real map underneath until it lines up with your image, then tap Pin it here. Maps are kept on this phone and work offline. For a PDF, take a screenshot first. Line up using two far-apart landmarks, like road crossings or lake shores.'})])}
+function startAlign(k){
+  const m=mapsMeta().find(x=>x.k===k);if(!m)return;
+  bget('img',k).then(b=>{if(!b){toast('That map image is missing.');return}aligning={k,rot:m.rot||0,op:.55};const im=$('#alignImg');im.src=URL.createObjectURL(b);
+    im.onload=()=>{aligning.iw=im.naturalWidth;aligning.ih=im.naturalHeight;
+      if(m.b){const latS=Math.abs(m.b[0]-m.b[2]),lonS=Math.abs(m.b[3]-m.b[1]);view.lat=(m.b[0]+m.b[2])/2;view.lon=(m.b[1]+m.b[3])/2;
+        const s=Math.min(.9*W/aligning.iw,.9*H/aligning.ih),wpx=aligning.iw*s;view.mpp=lonS*111320*Math.cos(view.lat*rad)/wpx;redraw()}
+      paint()};
+    const paint=()=>{im.style.opacity=aligning.op;im.style.transform='rotate('+aligning.rot+'deg)'};
+    const op=h('input',{type:'range',min:'15',max:'90',value:String(aligning.op*100),'aria-label':'See-through'}),ro=h('input',{type:'range',min:'-45',max:'45',step:'0.5',value:String(aligning.rot),'aria-label':'Rotate'}),rl=h('span',{class:'note',text:'Rotate '+aligning.rot+'°'});
+    op.addEventListener('input',()=>{aligning.op=+op.value/100;paint()});ro.addEventListener('input',()=>{aligning.rot=+ro.value;rl.textContent='Rotate '+aligning.rot+'°';paint()});
+    const end=()=>{$('#align').hidden=true;$('#actions').hidden=false;URL.revokeObjectURL(im.src);aligning=null;redraw()};
+    $('#alignBar').replaceChildren(h('div',{style:'font-weight:700',text:'Line up '+m.n}),h('div',{class:'note',text:'Drag and pinch the map underneath until it matches.'}),h('div',{style:'display:grid;grid-template-columns:1fr 1fr;gap:10px'},h('label',{class:'note'},'See-through',op),h('label',{class:'note'},rl,ro)),
+      h('div',{class:'row'},h('button',{class:'btn primary',text:'Pin it here',onclick:()=>{const s=Math.min(.9*W/aligning.iw,.9*H/aligning.ih),w=aligning.iw*s,hh=aligning.ih*s,tl=fromXY(W/2-w/2,H/2-hh/2),br=fromXY(W/2+w/2,H/2+hh/2);
+        setMaps(mapsMeta().map(x=>x.k===k?{...x,b:[tl[0],tl[1],br[0],br[1]],rot:aligning.rot,on:true}:x));toast('Map pinned. Change opacity or hide it in Menu, Your map images.');end()}}),h('button',{class:'btn',text:'Cancel',onclick:end})));
+    $('#align').hidden=false;$('#actions').hidden=true;paint()})}
 
 /* 3D terrain view */
 const V3={on:false,grid:null,yaw:0,pitch:45,zoom:1,ex:1.5,dirty:false,cx:0,cy:0,sc:1,D:1,w:0,h:0};
@@ -819,6 +950,7 @@ function draw(){
   n=0;for(let lo=Math.ceil(tl[1]/dLo)*dLo;lo<=br[1]&&n<200;lo+=dLo,n++){const x=Math.round(toXY(0,lo)[0])+.5;ctx.moveTo(x,0);ctx.lineTo(x,H)}
   ctx.stroke()}
   if(tiles)drawTiles();
+  drawUserMaps();drawBounds(txtAt);
   if(slopeOn&&sGrid&&can('terrain')){const g=sGrid,cwl=(g.lo1-g.lo0)/SN,chl=(g.la1-g.la0)/g.ny;
     for(let i=0;i<g.ny;i++)for(let j=0;j<SN;j++){const col=slopeCol(g.deg[i*SN+j]);if(!col)continue;const [x0,y0]=toXY(g.la1-chl*i,g.lo0+cwl*j),[x1,y1]=toXY(g.la1-chl*(i+1),g.lo0+cwl*(j+1));ctx.fillStyle=col+'73';ctx.fillRect(x0,y0,x1-x0+1,y1-y0+1)}}
   // search sectors, routes and tracks, search rings
@@ -857,8 +989,9 @@ function draw(){
   $('#scale').textContent=fmtDist(step)+' per square';
   const tm=$('#tilemsg'),showTm=!tmsgOff&&(SHARED||(tiles&&tOk===0&&tFail>=4));tm.hidden=!showTm;
   if(showTm)$('#tilemsgT').textContent=SHARED?'This shared page cannot show satellite or topo maps, because claude.ai blocks map images. Pins, sectors, routes and chat still work. Open the Ridgeline file in a web browser to see the map.':'Map images are not loading. If you opened this inside the Claude app, open the file in Safari or Chrome instead. Otherwise check your internet connection.';
-  $('#hint').hidden=features.size>0||showTm;
-  $('#attrib').hidden=!tiles;if(tiles)$('#attrib').textContent=TILE[bg].a;
+  const unitShown=updUnit();bSched();
+  $('#hint').hidden=features.size>0||showTm||unitShown;
+  $('#attrib').hidden=!tiles;if(tiles)$('#attrib').textContent=TILE[bg].a+(smaOn&&can('bounds')?' · Public land: BLM':'');
   $('#slopeLeg').hidden=!(slopeOn&&can('terrain'));
   {const fr=frOn(),cd=$('#coord');$('#frBadge').hidden=!fr;$('header h1').classList.toggle('fr',fr);cd.hidden=!fr;if(fr)cd.textContent='Cross '+usng(view.lat,view.lon)}$('#slopeMsg').textContent=sMsg?' · '+sMsg:'';slopeSched();crossElev();
 }
@@ -880,7 +1013,7 @@ function tap(x,y){
   for(const f of features.values()){if(f.type!=='pin'||!shown(f))continue;const [px,py]=toXY(f.la,f.lo),d=Math.hypot(px-x,py-y);if(d<=bd){bd=d;best=f}}
   if(!best){bd=16;for(const f of features.values()){if(f.type!=='track')continue;const P=f.pts.map(q=>toXY(q[0],q[1]));for(let i=1;i<P.length;i++){const d=segDist(x,y,P[i-1],P[i]);if(d<=bd){bd=d;best=f}}}}
   if(!best){for(const f of features.values()){if((f.type==='sector'||f.type==='area')&&f.pts.length>2&&inPoly(x,y,f.pts.map(q=>toXY(q[0],q[1])))){best=f;break}}}
-  if(best)openFeature(best.id)}
+  if(best)openFeature(best.id);else{const g_=fromXY(x,y),u=unitsAt(g_[0],g_[1]);if(u.length)openUnit(u)}}
 $('#zin').addEventListener('click',()=>zoomAt(W/2,H/2,0.6));
 $('#zout').addEventListener('click',()=>zoomAt(W/2,H/2,1.6));
 $('#addBtn').addEventListener('click',openAdd);$('#savedBtn').addEventListener('click',openSaved);
@@ -912,7 +1045,7 @@ function openAdd(){
     h('div',{class:'grid'},PLACE_KINDS.filter(k=>k!=='waypoint').map(k=>h('button',{class:'chip',text:KINDS[k].l,onclick:()=>addPin(k)}))),
     h('div',{class:'lbl',text:'Draw and measure'}),
     h('div',{class:'grid2'},[row('Build a route','Points along a trail, with time and climb',()=>startDraft('route')),row('Area shape','Hunting area or property, with size',()=>startDraft('area')),
-      row('Measure distance','Line distance and bearing',()=>startDraft('measure')),SHARED?null:row(rec?'Stop recording':'Record my track','Keep the screen on',toggleRec)]),
+      row('Measure distance','Line distance and bearing',()=>startDraft('measure')),row('Your map images','Upload a map and lay it over this one',()=>{if(!can('bounds')){upsell('bounds');return}openMaps()}),SHARED?null:row(rec?'Stop recording':'Record my track','Keep the screen on',toggleRec)]),
     h('div',{class:'lbl',text:'Navigate and photos'}),
     h('div',{class:'grid2'},[row('Compass','Heading, and the way to any pin',()=>openCompass(null)),photoRow]),
     h('div',{class:'lbl',text:'On the water'}),
@@ -1252,6 +1385,7 @@ function openMenu(){
     h('div',{class:'lbl',text:'Your name'}),name,
     h('div',{class:'lbl',text:'Units'}),units_,
     ...bgSection(),
+    ...boundsSection(),
     ...terrainSection(),
     ...installSection(),
     h('div',{class:'lbl',text:'Go to coordinates'}),go,
